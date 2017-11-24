@@ -24,4 +24,31 @@
         android:text="record"
         android:textColor="@android:color/white" />
 
+    <Button
+        android:id="@+id/left_color"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:text="Left" />
+
+    <Button
+        android:id="@+id/right_color"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_toEndOf="@+id/left_color"
+        android:text="Right" />
+
+    <TextView
+        android:id="@+id/instruction"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBottom="@+id/right_color"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_toEndOf="@+id/right_color"
+        android:textColor="#ff0000"
+        android:text="Tap each hand to set color selection before recording" />
+
 </RelativeLayout>

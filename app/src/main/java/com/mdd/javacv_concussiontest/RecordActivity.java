@@ -2,6 +2,8 @@ package com.mdd.javacv_concussiontest;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.Build;
 import android.os.Bundle;
@@ -9,6 +11,7 @@ import android.os.Environment;
 import android.os.PowerManager;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -17,17 +20,34 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
+
+import org.bytedeco.javacpp.indexer.UByteArrayIndexer;
+import org.bytedeco.javacpp.indexer.UByteIndexer;
+import org.bytedeco.javacpp.indexer.UByteRawIndexer;
+import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacpp.opencv_core.Mat;
+import org.bytedeco.javacpp.opencv_core.Rect;
+import org.bytedeco.javacpp.opencv_core.Scalar;
 import org.bytedeco.javacv.FFmpegFrameRecorder;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameRecorder;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.bytedeco.javacpp.avcodec.AV_CODEC_ID_MPEG4;
+import static org.bytedeco.javacpp.opencv_core.CV_8UC3;
+import static org.bytedeco.javacpp.opencv_core.CV_8UC4;
+import static org.bytedeco.javacpp.opencv_core.sumElems;
+import static org.bytedeco.javacpp.opencv_imgproc.COLOR_HSV2RGB_FULL;
+import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
+import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
+import static org.bytedeco.javacpp.opencv_imgproc.resize;
 
-public class RecordActivity extends Activity implements OnClickListener, CvCameraPreview.CvCameraViewListener {
+public class RecordActivity extends Activity implements OnClickListener, View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
 
     private final static String CLASS_LABEL = "RecordActivity";
     private final static String LOG_TAG = CLASS_LABEL;
@@ -41,6 +61,21 @@ public class RecordActivity extends Activity implements OnClickListener, CvCamer
     private OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
     private final Object semaphore = new Object();
 
+    //Color Detection global variables
+    private Mat mRgba;
+    private Mat mCamFrame;
+    private Mat mSpectrum = new Mat();
+    private opencv_core.Size SPECTRUM_SIZE = new opencv_core.Size(200, 64);
+    private Scalar mBlobColorHsv = new Scalar(255);
+    private Scalar mBlobColorRgba = new Scalar(255);
+    private boolean[] mIsColorSelected = new boolean[2];
+    private ColorBlobDetector mDetectorL = new ColorBlobDetector();
+    private ColorBlobDetector mDetectorR = new ColorBlobDetector();
+    private List<ColorBlobDetector> mDetectorList = new ArrayList<>();
+    private int selector = 0;
+    private Button leftButton;
+    private Button rightButton;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,6 +86,8 @@ public class RecordActivity extends Activity implements OnClickListener, CvCamer
         setContentView(R.layout.activity_record);
 
         cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
+        leftButton = (Button) findViewById(R.id.left_color);
+        rightButton = (Button) findViewById(R.id.right_color);
 
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, CLASS_LABEL);
@@ -120,6 +157,7 @@ public class RecordActivity extends Activity implements OnClickListener, CvCamer
         btnRecorderControl.setOnClickListener(this);
 
         cameraView.setCvCameraViewListener(this);
+        cameraView.setOnTouchListener(this);
     }
 
     private void initRecorder(int width, int height) {
@@ -260,6 +298,10 @@ public class RecordActivity extends Activity implements OnClickListener, CvCamer
 
     @Override
     public void onCameraViewStarted(int width, int height) {
+        mRgba = new Mat();
+        mCamFrame = new Mat();
+        mDetectorList.add(mDetectorL);
+        mDetectorList.add(mDetectorR);
         initRecorder(width, height);
     }
 
@@ -268,8 +310,96 @@ public class RecordActivity extends Activity implements OnClickListener, CvCamer
         stopRecording();
     }
 
+    public boolean onTouch(View v, MotionEvent event) {
+        mRgba = mCamFrame;
+
+        int cols = mRgba.cols();
+        int rows = mRgba.rows();
+
+        int xOffset = (cameraView.getWidth() - cols) / 2;
+        int yOffset = (cameraView.getHeight() - rows) / 2;
+
+        int x = (int)event.getX() - xOffset;
+        int y = (int)event.getY() - yOffset;
+
+        Log.i(LOG_TAG, "Touched image coordinates: (" + x + ", " + y + ")");
+
+        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
+
+        Rect touchedRect = new Rect();
+
+        int tmpx = (x>5) ? x-5 : 0;
+        int tmpy = (y>5) ? y-5 : 0;
+        touchedRect.x(tmpx);// = (x>5) ? x-5 : 0;
+        touchedRect.y(tmpy);// = (y>5) ? y-5 : 0;
+
+        int tmpw = (x+5 < cols) ? x + 5 - touchedRect.x() : cols - touchedRect.x();
+        int tmph = (y+5 < rows) ? y + 5 - touchedRect.y() : rows - touchedRect.y();
+        touchedRect.width(tmpw);
+        touchedRect.height(tmph);
+
+        Mat touchedRegionRgba = new Mat(mRgba, touchedRect);
+        Mat touchedRegionHsv = new Mat();
+        cvtColor(touchedRegionRgba, touchedRegionHsv, COLOR_RGB2HSV_FULL);
+
+        // Calculate average color of touched region
+        mBlobColorHsv = sumElems(touchedRegionHsv);
+        int pointCount = touchedRect.width()*touchedRect.height();
+        for (int i = 0; i < 3; i++) {
+            mBlobColorHsv.put(i, mBlobColorHsv.get(i) / pointCount);
+        }
+
+        //convert the Hsv colour blob to rgba
+        mBlobColorRgba = convertScalarHsv2Rgba(mBlobColorHsv);
+
+        int red = (int)mBlobColorRgba.get(0);
+        int green = (int)mBlobColorRgba.get(1);
+        int blue = (int)mBlobColorRgba.get(2);
+        int alpha = (int)mBlobColorRgba.get(3);
+        String hexcolor = String.format("#%02x%02x%02x%02x", alpha, red, green, blue);
+        Log.i(LOG_TAG, "Touched rgba color: (" + hexcolor + ")");
+        Log.i(LOG_TAG, "red: (" + red + ")");
+        Log.i(LOG_TAG, "green: (" + green + ")");
+        Log.i(LOG_TAG, "blue: (" + blue + ")");
+        Log.i(LOG_TAG, "alpha: (" + alpha + ")");
+
+        mDetectorList.get(selector).setHsvColor(mBlobColorHsv);
+
+        resize(mDetectorList.get(selector).getSpectrum(), mSpectrum, SPECTRUM_SIZE);
+
+        mIsColorSelected[selector] = true;
+
+        //set the colour of one of the buttons to the rgba colour selected
+        if (selector == 0) {
+            leftButton.setBackgroundColor(Color.parseColor(hexcolor));
+        } else {
+            rightButton.setBackgroundColor(Color.parseColor(hexcolor));
+        }
+
+        selector ^= 1;
+
+        touchedRegionRgba.release();
+        touchedRegionHsv.release();
+
+        return false; // don't need subsequent touch events
+    }
+
+    private opencv_core.Scalar convertScalarHsv2Rgba(Scalar hsvColor) {
+        Mat pointMatRgba = new Mat(1, 1, CV_8UC4);
+        ///TODO FIND OUT WHY THE LINE BELOW DOESNT WORK AND FIX IT - IT CAUSES COLOR DETECTION TO NOT WORK
+        Mat pointMatHsv = new Mat(1, 1, CV_8UC3, hsvColor);
+
+        UByteRawIndexer idxRgba = pointMatRgba.createIndexer();
+
+        cvtColor(pointMatHsv, pointMatRgba, COLOR_HSV2RGB_FULL, 4);
+
+        return new Scalar(idxRgba.get(0,0));
+    }
+
     @Override
     public Mat onCameraFrame(Mat mat) {
+        mat.copyTo(mCamFrame);
+
         if (recording && mat != null) {
             synchronized (semaphore) {
                 try {
