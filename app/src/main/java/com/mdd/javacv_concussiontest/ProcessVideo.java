@@ -16,6 +16,9 @@ import static org.bytedeco.javacpp.opencv_core.RotatedRect;
 import static org.bytedeco.javacpp.opencv_core.MatVector;
 import static org.bytedeco.javacpp.opencv_core.inRange;
 import static org.bytedeco.javacpp.opencv_core.multiply;
+import static org.bytedeco.javacpp.opencv_core.Moments;
+import static org.bytedeco.javacpp.opencv_imgproc.moments;
+
 
 import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacpp.opencv_core.CvRect;
@@ -161,7 +164,11 @@ public class ProcessVideo {
                 //create a new bounding rectangle from the largest contour area
                 Rect boundRect = boundingRect(contours.get(boundPos));
 
-                //get centroids
+                //get centroids of the bounding contour
+                Moments mc = moments(contours.get(boundPos), false);
+                int centroidx = (int) (mc.m10() / mc.m00());
+                int centroidy = (int) (mc.m01() / mc.m00());
+                centroidPoints[k] = centroidy;
             }
 
             // Delay
