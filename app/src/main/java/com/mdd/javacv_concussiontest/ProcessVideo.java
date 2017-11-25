@@ -11,8 +11,11 @@ import static org.bytedeco.javacpp.opencv_core.Scalar;
 import static org.bytedeco.javacpp.opencv_core.Size;
 import static org.bytedeco.javacpp.opencv_imgproc.*;
 import static org.bytedeco.javacpp.opencv_core.Mat;
+import static org.bytedeco.javacpp.opencv_core.Rect;
+import static org.bytedeco.javacpp.opencv_core.RotatedRect;
 import static org.bytedeco.javacpp.opencv_core.MatVector;
 import static org.bytedeco.javacpp.opencv_core.inRange;
+import static org.bytedeco.javacpp.opencv_core.multiply;
 
 import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacpp.opencv_core.CvRect;
@@ -22,6 +25,7 @@ import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 
@@ -43,6 +47,7 @@ public class ProcessVideo {
         //elements required for image processing
         Scalar mLowerBound = new Scalar(0);
         Scalar mUpperBound = new Scalar(0);
+        double mMinContourArea = 0.1;
         int selector = 0;
         int[] numCycles = new int[2];
         int[] dirChange = new int[2];
@@ -67,6 +72,7 @@ public class ProcessVideo {
             // process the frame
             Mat mRgba = toMatConverter.convert(frame);
 
+            MatVector mContours = new MatVector();
             int[] centroidPoints = new int[2];
             String[] dirYprev = new String[2];
 
@@ -109,10 +115,51 @@ public class ProcessVideo {
                 findContours(mDilatedMask, contours, mHierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 
                 //find max contour area
+                double maxArea = 0;
+
+                //iterate over list of contour vectors
+                for (int i = 0; i < contours.size(); i++) {
+                    Mat contour = contours.get(i);
+                    //contour - Input vector of 2D points (contour vertices)
+                    double area = contourArea(contour);
+                    if (area > maxArea)
+                        maxArea = area;
+                }
 
                 //filter contours by area and resize to fit original image size
+                for (int i = 0; i < contours.size(); i++) {
+                    Mat contour = contours.get(i);
+                    if (contourArea(contour) > mMinContourArea*maxArea) {
+                        //multiply - Calculates the per-element scaled product of two arrays.
+                        //multiply(Mat src1, Scalar src2, Mat dst)
+                        //src1 - First source array.
+                        //src2 - Second source array of the same size and the same type as src1.
+                        //dst - Destination array of the same size and type as src1.
+                        multiply(4, contour);
+                        mContours.put(contour);
+                    }
+                }
 
                 //get bounding rectangle
+                RotatedRect rect = minAreaRect(contours.get(0));
+
+                double boundWidth = rect.size().width();
+                double boundHeight = rect.size().height();
+                int boundPos = 0;
+
+                //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
+                for (int i = 1; i < contours.size(); i++) {
+                    rect = minAreaRect(contours.get(i));
+                    if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
+                        boundWidth = rect.size().width();
+                        boundHeight = rect.size().height();
+                        //store the location in the contour list of the maximum area bounding rectangle
+                        boundPos = i;
+                    }
+                }
+
+                //create a new bounding rectangle from the largest contour area
+                Rect boundRect = boundingRect(contours.get(boundPos));
 
                 //get centroids
             }
