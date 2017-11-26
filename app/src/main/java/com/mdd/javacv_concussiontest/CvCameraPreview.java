@@ -87,8 +87,8 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
      * it and a lower value is required (but the aspect ratio should remain the same).<br />
      * See {@link CvCameraPreview#getBestSize(List, int)} for more information.
      */
-    //private final int PREVIEW_MAX_WIDTH = 640;
-    private final int PREVIEW_MAX_WIDTH = 1440;
+    private final int PREVIEW_MAX_WIDTH = 640;
+    //private final int PREVIEW_MAX_WIDTH = 1280;
 
 
     /**
@@ -97,8 +97,7 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
      * fired. Again, this is a maximum value and could not be the
      * real one implemented by the device.
      */
-    //private final int PICTURE_MAX_WIDTH = 1280;
-    private final int PICTURE_MAX_WIDTH = 1440;
+    private final int PICTURE_MAX_WIDTH = 1280;
 
     /**
      * In this example we look at camera preview buffer functionality too.<br />

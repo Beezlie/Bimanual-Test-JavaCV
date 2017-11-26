@@ -45,7 +45,7 @@ public class VideoProcessor {
         this.pxscale = pxscale;
     }
 
-    public void main(String[] args) throws FrameGrabber.Exception, InterruptedException {
+    public void process(String name, int scale) throws FrameGrabber.Exception, InterruptedException {
 
         String LOG_TAG = "VideoProcessor";
         //String filename = Environment.getExternalStorageDirectory() + "/stream.mp4";

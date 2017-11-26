@@ -69,16 +69,17 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
 
     //Color Detection global variables
     private Mat mRgba;
-    private Mat mCamFrame;
     private Mat mSpectrum = new Mat();
     private opencv_core.Size SPECTRUM_SIZE = new opencv_core.Size(200, 64);
     private Scalar mBlobColorHsv = new Scalar(255);
     private Scalar mBlobColorRgba = new Scalar(255);
     private boolean[] mIsColorSelected = new boolean[2];
+    private boolean screenTouched = false;
     private ColorBlobDetector mDetectorL = new ColorBlobDetector();
     private ColorBlobDetector mDetectorR = new ColorBlobDetector();
     private List<ColorBlobDetector> mDetectorList = new ArrayList<>();
     private int selector = 0;
+    private int xTouch, yTouch;
     private String hexcolor;
     private Button leftButton;
     private Button rightButton;
@@ -180,7 +181,6 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         cameraView.setOnTouchListener(this);
     }
 
-    //TODO figure out why height = 0 when I hard code the screen size in CvCameraPreview
     private void initRecorder(int width, int height) {
         int degree = getRotationDegree();
         Camera.CameraInfo info = new Camera.CameraInfo();
@@ -320,7 +320,6 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     @Override
     public void onCameraViewStarted(int width, int height) {
         mRgba = new Mat(height, width, CV_8UC4);
-        mCamFrame = new Mat(height, width, CV_8UC4);
         mDetectorList.add(mDetectorL);
         mDetectorList.add(mDetectorR);
         initRecorder(width, height);
@@ -332,21 +331,55 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     }
 
     public boolean onTouch(View v, MotionEvent event) {
-        mRgba = mCamFrame;
+        xTouch = (int)event.getX();
+        yTouch = (int)event.getY();
+        screenTouched = true;
 
+        return false; // don't need subsequent touch events
+    }
+
+    @Override
+    public Mat onCameraFrame(Mat mat) {
+        if (screenTouched) {
+            mat.copyTo(mRgba);
+            getPixelColor(xTouch, yTouch);
+        }
+
+        if (recording && mat != null) {
+            synchronized (semaphore) {
+                try {
+                    Frame frame = converterToMat.convert(mat);
+                    long t = 1000 * (System.currentTimeMillis() - startTime);
+                    if (t > recorder.getTimestamp()) {
+                        recorder.setTimestamp(t);
+                    }
+                    recorder.record(frame);
+                } catch (FFmpegFrameRecorder.Exception e) {
+                    Log.v(LOG_TAG, e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
+        return mat;
+    }
+
+    private void getPixelColor(int xTouch, int yTouch) {
         int cols = mRgba.cols();
         int rows = mRgba.rows();
 
-        //TODO fix incorrect calculation of offset - right now it is just using rows/cols - need the larger num
         int xOffset = (cameraView.getPictureWidth() - cols) / 2;
         int yOffset = (cameraView.getPictureHeight() - rows) / 2;
 
-        int x = (int)event.getX() - xOffset;
-        int y = (int)event.getY() - yOffset;
+        //TODO fix incorrect calculation of x and y - need to scale xTouch and yTouch so x and y are within the matrix dimens
+        int x = xTouch- xOffset;
+        int y = yTouch - yOffset;
 
         Log.i(LOG_TAG, "Touched image coordinates: (" + x + ", " + y + ")");
 
-        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
+        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) {
+            screenTouched = false;
+            return;
+        }
 
         Rect touchedRect = new Rect();
 
@@ -394,25 +427,22 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
 
         //set the colour of one of the buttons to the rgba colour selected
         if (selector == 0) {
-            //mHandler.post(mUpdateLeftButton);
-            leftButton.setBackgroundColor(Color.parseColor(hexcolor));
+            mHandler.post(mUpdateLeftButton);
+            //leftButton.setBackgroundColor(Color.parseColor(hexcolor));
         } else {
-            //mHandler.post(mUpdateRightButton);
-            rightButton.setBackgroundColor(Color.parseColor(hexcolor));
+            mHandler.post(mUpdateRightButton);
         }
 
         selector ^= 1;
+        screenTouched = false;
 
         touchedRegionRgba.release();
         touchedRegionHsv.release();
-
-        return false; // don't need subsequent touch events
     }
 
-    private opencv_core.Scalar convertScalarHsv2Rgba(Scalar hsvColor) {
+    private Scalar convertScalarHsv2Rgba(Scalar hsvColor) {
         Mat pointMatRgba = new Mat(1, 1, CV_8UC3);
         ///TODO FIND OUT WHY THE LINE BELOW DOESNT WORK AND FIX IT - IT CAUSES COLOR DETECTION TO NOT WORK
-        //TODO Fix the fact that ontouch only works for center of screen
         //TODO Fix the fact that color doesnt set properly
         DoublePointer dp = new DoublePointer(hsvColor.get(0), hsvColor.get(1), hsvColor.get(2), hsvColor.get(3));
         Mat pointMatHsv = new Mat(1, 1, CV_8UC3, dp);
@@ -427,28 +457,6 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         Scalar result = new Scalar(r, g, b, 0);
 
         return result;
-    }
-
-    @Override
-    public Mat onCameraFrame(Mat mat) {
-        mat.copyTo(mCamFrame);
-
-        if (recording && mat != null) {
-            synchronized (semaphore) {
-                try {
-                    Frame frame = converterToMat.convert(mat);
-                    long t = 1000 * (System.currentTimeMillis() - startTime);
-                    if (t > recorder.getTimestamp()) {
-                        recorder.setTimestamp(t);
-                    }
-                    recorder.record(frame);
-                } catch (FFmpegFrameRecorder.Exception e) {
-                    Log.v(LOG_TAG, e.getMessage());
-                    e.printStackTrace();
-                }
-            }
-        }
-        return mat;
     }
 
     public void updateLeftButtonColor() {
