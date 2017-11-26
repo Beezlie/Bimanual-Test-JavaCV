@@ -4,7 +4,6 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/JavaCV-Concussion-Test.iml" filepath="$PROJECT_DIR$/JavaCV-Concussion-Test.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/javacvconcussiontest.iml" filepath="$PROJECT_DIR$/javacvconcussiontest.iml" />
     </modules>
   </component>

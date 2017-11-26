@@ -17,8 +17,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
         android:screenOrientation="landscape"
+        android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity">
             <intent-filter>
@@ -33,6 +33,7 @@
         <activity
             android:name=".OpenCvActivity"
             android:screenOrientation="landscape" />
+        <activity android:name=".ProcessVideoActivity"></activity>
     </application>
 
 </manifest>

@@ -8,6 +8,7 @@ import android.hardware.Camera;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.PowerManager;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -22,6 +23,9 @@ import android.widget.Toast;
 
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
+import org.bytedeco.javacpp.DoublePointer;
+import org.bytedeco.javacpp.IntPointer;
+import org.bytedeco.javacpp.indexer.DoubleIndexer;
 import org.bytedeco.javacpp.indexer.UByteArrayIndexer;
 import org.bytedeco.javacpp.indexer.UByteIndexer;
 import org.bytedeco.javacpp.indexer.UByteRawIndexer;
@@ -41,9 +45,11 @@ import java.util.List;
 import static org.bytedeco.javacpp.avcodec.AV_CODEC_ID_MPEG4;
 import static org.bytedeco.javacpp.opencv_core.CV_8UC3;
 import static org.bytedeco.javacpp.opencv_core.CV_8UC4;
+import static org.bytedeco.javacpp.opencv_core.CV_64F;
 import static org.bytedeco.javacpp.opencv_core.sumElems;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_HSV2RGB_FULL;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
+import static org.bytedeco.javacpp.opencv_imgproc.cvCvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.resize;
 
@@ -55,7 +61,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     private boolean recording;
     private CvCameraPreview cameraView;
     private Button btnRecorderControl;
-    private File savePath = new File(Environment.getExternalStorageDirectory(), "stream.mp4");
+    private File savePath = new File(Environment.getExternalStorageDirectory(), "bimanualtest.mp4");
     private FFmpegFrameRecorder recorder;
     private long startTime = 0;
     private OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
@@ -73,8 +79,22 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     private ColorBlobDetector mDetectorR = new ColorBlobDetector();
     private List<ColorBlobDetector> mDetectorList = new ArrayList<>();
     private int selector = 0;
+    private String hexcolor;
     private Button leftButton;
     private Button rightButton;
+    final Handler mHandler = new Handler();
+
+    final Runnable mUpdateLeftButton = new Runnable() {
+        public void run() {
+            updateLeftButtonColor();
+        }
+    };
+
+    final Runnable mUpdateRightButton = new Runnable() {
+        public void run() {
+            updateRightButtonColor();
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -160,6 +180,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         cameraView.setOnTouchListener(this);
     }
 
+    //TODO figure out why height = 0 when I hard code the screen size in CvCameraPreview
     private void initRecorder(int width, int height) {
         int degree = getRotationDegree();
         Camera.CameraInfo info = new Camera.CameraInfo();
@@ -202,7 +223,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         recorder.setVideoCodec(AV_CODEC_ID_MPEG4);
         recorder.setVideoQuality(1);
         // Set in the surface changed method
-        recorder.setFrameRate(16);
+        recorder.setFrameRate(30);
 
         Log.i(LOG_TAG, "recorder initialize success");
     }
@@ -298,8 +319,8 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        mRgba = new Mat();
-        mCamFrame = new Mat();
+        mRgba = new Mat(height, width, CV_8UC4);
+        mCamFrame = new Mat(height, width, CV_8UC4);
         mDetectorList.add(mDetectorL);
         mDetectorList.add(mDetectorR);
         initRecorder(width, height);
@@ -316,8 +337,9 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         int cols = mRgba.cols();
         int rows = mRgba.rows();
 
-        int xOffset = (cameraView.getWidth() - cols) / 2;
-        int yOffset = (cameraView.getHeight() - rows) / 2;
+        //TODO fix incorrect calculation of offset - right now it is just using rows/cols - need the larger num
+        int xOffset = (cameraView.getPictureWidth() - cols) / 2;
+        int yOffset = (cameraView.getPictureHeight() - rows) / 2;
 
         int x = (int)event.getX() - xOffset;
         int y = (int)event.getY() - yOffset;
@@ -356,7 +378,8 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         int green = (int)mBlobColorRgba.get(1);
         int blue = (int)mBlobColorRgba.get(2);
         int alpha = (int)mBlobColorRgba.get(3);
-        String hexcolor = String.format("#%02x%02x%02x%02x", alpha, red, green, blue);
+        //String hexcolor = String.format("#%02x%02x%02x%02x", alpha, red, green, blue);
+        hexcolor = String.format("#%02x%02x%02x", red, green, blue);
         Log.i(LOG_TAG, "Touched rgba color: (" + hexcolor + ")");
         Log.i(LOG_TAG, "red: (" + red + ")");
         Log.i(LOG_TAG, "green: (" + green + ")");
@@ -371,8 +394,10 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
 
         //set the colour of one of the buttons to the rgba colour selected
         if (selector == 0) {
+            //mHandler.post(mUpdateLeftButton);
             leftButton.setBackgroundColor(Color.parseColor(hexcolor));
         } else {
+            //mHandler.post(mUpdateRightButton);
             rightButton.setBackgroundColor(Color.parseColor(hexcolor));
         }
 
@@ -385,15 +410,23 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     }
 
     private opencv_core.Scalar convertScalarHsv2Rgba(Scalar hsvColor) {
-        Mat pointMatRgba = new Mat(1, 1, CV_8UC4);
+        Mat pointMatRgba = new Mat(1, 1, CV_8UC3);
         ///TODO FIND OUT WHY THE LINE BELOW DOESNT WORK AND FIX IT - IT CAUSES COLOR DETECTION TO NOT WORK
-        Mat pointMatHsv = new Mat(1, 1, CV_8UC3, hsvColor);
+        //TODO Fix the fact that ontouch only works for center of screen
+        //TODO Fix the fact that color doesnt set properly
+        DoublePointer dp = new DoublePointer(hsvColor.get(0), hsvColor.get(1), hsvColor.get(2), hsvColor.get(3));
+        Mat pointMatHsv = new Mat(1, 1, CV_8UC3, dp);
 
         UByteRawIndexer idxRgba = pointMatRgba.createIndexer();
 
         cvtColor(pointMatHsv, pointMatRgba, COLOR_HSV2RGB_FULL, 4);
 
-        return new Scalar(idxRgba.get(0,0));
+        double r = idxRgba.get(0,0);
+        double g = idxRgba.get(0,1);
+        double b = idxRgba.get(0,2);
+        Scalar result = new Scalar(r, g, b, 0);
+
+        return result;
     }
 
     @Override
@@ -416,5 +449,14 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
             }
         }
         return mat;
+    }
+
+    public void updateLeftButtonColor() {
+        leftButton.setBackgroundColor(Color.parseColor(hexcolor));
+    }
+
+    public void updateRightButtonColor() {
+        //rightButton.setBackgroundColor(Color.argb(alpha, red, green, blue));
+        rightButton.setBackgroundColor(Color.parseColor(hexcolor));
     }
 }

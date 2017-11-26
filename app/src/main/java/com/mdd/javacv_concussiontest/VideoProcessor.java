@@ -31,24 +31,23 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-
 /**
  * The example for section "Reading video sequences" in Chapter 10, page 248.
  * <p>
  * This version of the example is implemented using JavaCV `FFmpegFrameGrabber`class.
  */
-public class ProcessVideo {
+public class VideoProcessor {
     private final String filename;
     private final double pxscale;
 
-    public ProcessVideo(String filename, double pxscale) {
+    public VideoProcessor(String filename, double pxscale) {
         this.filename = filename;
         this.pxscale = pxscale;
     }
 
     public void main(String[] args) throws FrameGrabber.Exception, InterruptedException {
 
-        String LOG_TAG = "ProcessVideo";
+        String LOG_TAG = "VideoProcessor";
         //String filename = Environment.getExternalStorageDirectory() + "/stream.mp4";
         //String filename = args[0];
 
@@ -60,7 +59,6 @@ public class ProcessVideo {
         Scalar mUpperBound = new Scalar(0);
         Scalar CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
         double mMinContourArea = 0.1;
-        int selector = 0;
         int[] numCycles = new int[2];
         int[] dirChange = new int[2];
         int[] minPeak = {10000, 10000};
@@ -69,7 +67,6 @@ public class ProcessVideo {
         String[] dirY = new String[2];
         boolean[] movingY = new boolean[2];
         ArrayDeque<int[]> movingWindow = new ArrayDeque<>();
-        //insert new amplitude after each up/down cycle
         List<Integer> amplitudesL = new ArrayList<>();
         List<Integer> amplitudesR = new ArrayList<>();
 
@@ -253,7 +250,7 @@ public class ProcessVideo {
                 finishedTest = true;
             }
 
-            imshow("face_recognizer", mRgba);
+            imshow("bimanual_test", mRgba);
 
             // Delay
             Thread.sleep(delay);

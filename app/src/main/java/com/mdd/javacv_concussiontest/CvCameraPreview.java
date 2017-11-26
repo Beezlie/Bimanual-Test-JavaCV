@@ -87,7 +87,9 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
      * it and a lower value is required (but the aspect ratio should remain the same).<br />
      * See {@link CvCameraPreview#getBestSize(List, int)} for more information.
      */
-    private final int PREVIEW_MAX_WIDTH = 640;
+    //private final int PREVIEW_MAX_WIDTH = 640;
+    private final int PREVIEW_MAX_WIDTH = 1440;
+
 
     /**
      * The maximum dimension (in pixels) of the images produced when a
@@ -95,7 +97,8 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
      * fired. Again, this is a maximum value and could not be the
      * real one implemented by the device.
      */
-    private final int PICTURE_MAX_WIDTH = 1280;
+    //private final int PICTURE_MAX_WIDTH = 1280;
+    private final int PICTURE_MAX_WIDTH = 1440;
 
     /**
      * In this example we look at camera preview buffer functionality too.<br />
@@ -131,6 +134,7 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
     private SurfaceTexture surfaceTexture;
     private int frameWidth, frameHeight;
     private int scaleType = SCALE_FIT;
+    private int measuredW, measuredH;
 
     public CvCameraPreview(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -353,9 +357,15 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
             }
         }
 
+        measuredW = width;
+        measuredH = height;
         setMeasuredDimension(width, height);
         Log.i(LOG_TAG, "onMeasure(): set surface dimension to " + width + "x" + height);
     }
+
+    public int getPictureWidth() {return measuredW;}
+
+    public int getPictureHeight() {return measuredH;}
 
     private boolean connectCamera() {
         /* 1. We need to instantiate camera
@@ -492,8 +502,12 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
             if (sizes != null) {
                 Size bestPreviewSize = getBestSize(sizes, PREVIEW_MAX_WIDTH);
 
+                //TODO figure out how to get this working without hard coding
+                //right now the bestPreview size is too small so the matrix returned from onCameraFrame is only 640x480
                 frameWidth = bestPreviewSize.width;
                 frameHeight = bestPreviewSize.height;
+                //frameHeight = 720;
+                //frameWidth = 1280;
 
                 parameters.setPreviewSize(bestPreviewSize.width, bestPreviewSize.height);
 
