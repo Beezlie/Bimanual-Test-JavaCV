@@ -2,4 +2,8 @@
     <string name="app_name">JavaCvAndroidCameraPreview</string>
     <string name="permission_warning">To continue, please enable Camera and Read Write External Storage permission for this application.</string>
     <string name="dismiss">Dismiss</string>
+    <string name="calibrate_title">Calibration Parameters</string>
+    <string name="button_send">Submit</string>
+    <string name="focal_mm">Distance to camera (mm)</string>
+    <string name="sensor_width_mm">Camera Sensor Width (mm)</string>
 </resources>

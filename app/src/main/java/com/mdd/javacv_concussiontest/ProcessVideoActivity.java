@@ -1,6 +1,7 @@
 package com.mdd.javacv_concussiontest;
 
 import android.content.SharedPreferences;
+import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -17,10 +18,7 @@ public class ProcessVideoActivity extends AppCompatActivity {
         setContentView(R.layout.activity_processvideo);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        String filename = prefs.getString("filename", null);
-        if (filename == null) {
-            Log.i(TAG, "Video file bimanualtest.mp4 does not exist");
-        }
+        String filename = Environment.getExternalStorageDirectory() + "/bimanualtest.mp4";
         int pxscale = prefs.getInt("pxscale", 0);
         if (pxscale == 0) {
             Log.i(TAG, "Camera was not calibrated correctly");

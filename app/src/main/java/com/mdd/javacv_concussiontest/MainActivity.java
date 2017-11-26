@@ -48,16 +48,14 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        /*
         findViewById(R.id.btnCalibrate).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if (mPermissionReady) {
-                    startActivity(new Intent(MainActivity.this, CameraCalibrationActivity.class));
+                    startActivity(new Intent(MainActivity.this, CalibrateActivity.class));
                 }
             }
         });
-        */
 
         int cameraPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
         int storagePermssion = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);

@@ -33,7 +33,8 @@
         <activity
             android:name=".OpenCvActivity"
             android:screenOrientation="landscape" />
-        <activity android:name=".ProcessVideoActivity"></activity>
+        <activity android:name=".ProcessVideoActivity" />
+        <activity android:name=".CalibrateActivity"></activity>
     </application>
 
 </manifest>
