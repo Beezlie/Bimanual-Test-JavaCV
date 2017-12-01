@@ -31,15 +31,6 @@ public class ProcessVideoActivity extends AppCompatActivity {
 
         //get pxscale and upper/lower thresholds
         getParams();
-
-        VideoProcessor vidProc = new VideoProcessor(filename, pxscale, mUpperBound, mLowerBound);
-        try {
-            vidProc.process();
-        } catch (InterruptedException e) {
-
-        } catch (FrameGrabber.Exception e) {
-
-        }
     }
 
     public void getParams() {

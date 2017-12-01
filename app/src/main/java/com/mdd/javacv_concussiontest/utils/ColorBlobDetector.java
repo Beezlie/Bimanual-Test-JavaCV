@@ -56,6 +56,7 @@ public class ColorBlobDetector {
 
         Mat spectrumHsv = new Mat(1, (int)(maxH-minH), CV_8UC3);
 
+        //TODO - figure out why spectrumHsv null after this
         for (int j = 0; j < maxH-minH; j++) {
             byte[] tmp = {(byte)(minH+j), (byte)255, (byte)255};
             //spectrumHsv.put(0, j, tmp);
@@ -81,6 +82,7 @@ public class ColorBlobDetector {
             GaussianBlur(mRgba, mRgba, new Size(3, 3), 1);
 
             //pyrdown x2
+            //TODO - figure out why mPyrDownMat null after this
             pyrDown(mRgba, mPyrDownMat);
             pyrDown(mPyrDownMat, mPyrDownMat);
 
@@ -103,8 +105,9 @@ public class ColorBlobDetector {
             Mat lowerBoundMat = new Mat(1, 1, CV_8UC4, dpl);
             DoublePointer dph = new DoublePointer(mLowerBound.get(0), mLowerBound.get(1), mLowerBound.get(2), mLowerBound.get(3));
             Mat upperBoundMat = new Mat(1, 1, CV_8UC4, dph);
+            //TODO - figure out why mHsvMay and mMask are both null after this
+            //inRange(src, low, high, dst)
             inRange(mHsvMat, lowerBoundMat, upperBoundMat, mMask);
-
 
             //dilate
             dilate(mMask, mDilatedMask, new Mat());

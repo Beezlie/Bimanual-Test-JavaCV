@@ -2,8 +2,6 @@ package com.mdd.javacv_concussiontest;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
@@ -32,16 +30,14 @@ import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * The example for section "Reading video sequences" in Chapter 10, page 248.
- * <p>
- * This version of the example is implemented using JavaCV `FFmpegFrameGrabber`class.
- */
-public class VideoProcessor extends AsyncTask<Void, Integer, Void> {
+public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private Activity activity;
     private ProgressDialog asyncDialog;
     private final String filename;
@@ -64,10 +60,12 @@ public class VideoProcessor extends AsyncTask<Void, Integer, Void> {
     private List<Integer> amplitudesL = new ArrayList<>();
     private List<Integer> amplitudesR = new ArrayList<>();
     private List<ColorBlobDetector> mDetectorList = new ArrayList<>();
+    private File root;
+    private File datafile;
+    private FileWriter writer;
 
     public VideoProcessor(Activity activity, String filename, double pxscale, List<ColorBlobDetector> mDetectorList) {
         this.activity = activity;
-        asyncDialog = new ProgressDialog(activity);
         this.filename = filename;
         this.pxscale = pxscale;
         this.mDetectorList = mDetectorList;
@@ -75,6 +73,7 @@ public class VideoProcessor extends AsyncTask<Void, Integer, Void> {
 
     @Override
     protected void onPreExecute() {
+        asyncDialog = new ProgressDialog(activity);
         //set message of the dialog
         asyncDialog.setMessage("Loading");
         //show dialog
@@ -82,6 +81,14 @@ public class VideoProcessor extends AsyncTask<Void, Integer, Void> {
 
         grabber = new FFmpegFrameGrabber(filename);
         toMatConverter = new OpenCVFrameConverter.ToMat();
+
+        root = new File(Environment.getExternalStorageDirectory().toString());
+        datafile = new File(root, "data.txt");
+        try {
+            writer = new FileWriter(datafile);
+        } catch (IOException e) {
+            exception = e;
+        }
 
         super.onPreExecute();
     }
@@ -120,6 +127,9 @@ public class VideoProcessor extends AsyncTask<Void, Integer, Void> {
                     }
 
                     Log.d(TAG, "Contours count: " + contours[k].size());
+                    if (contours[k].size() <= 0) {
+                        break;
+                    }
 
                     //get bounding rectangle
                     RotatedRect rect = minAreaRect(contours[k].get(0));
@@ -206,15 +216,26 @@ public class VideoProcessor extends AsyncTask<Void, Integer, Void> {
                     //display results once 10 cycles completed
                     if (numCycles[0] >= 10 && numCycles[1] >= 10 && !finishedTest) {
                         for (int amp : amplitudesR) {
-                            Log.i(TAG, "Right hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0]);
+                            String result = "Right hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0];
+                            Log.i(TAG, result);
+                            try {
+                                writer.append(result);
+                            } catch (IOException e) {
+                                exception = e;
+                            }
                         }
                         for (int amp : amplitudesL) {
-                            Log.i(TAG, "Left hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0]);
+                            String result = "Left hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0];
+                            Log.i(TAG, result);
+                            try {
+                                writer.append(result);
+                            } catch (IOException e) {
+                                exception = e;
+                            }
                         }
                         finishedTest = true;
                     }
                 }
-                imshow("bimanual_test", mRgba);
 
                 // Delay
                 try {
@@ -231,6 +252,14 @@ public class VideoProcessor extends AsyncTask<Void, Integer, Void> {
         try {
             grabber.release();
         } catch (FrameGrabber.Exception e) {
+            exception = e;
+        }
+
+        try {
+            writer.append("Test Completed");
+            writer.flush();
+            writer.close();
+        } catch (IOException e) {
             exception = e;
         }
 

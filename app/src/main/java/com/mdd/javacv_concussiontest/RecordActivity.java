@@ -1,6 +1,7 @@
 package com.mdd.javacv_concussiontest;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -185,7 +186,9 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
                 stopRecording();
             }
 
-            finish();
+            //TODO - maybe remove this line so the app doesnt stop because of:
+            //"Cancelling event due to no window focus: KeyEvent"
+            //finish();
 
             return true;
         }
@@ -520,158 +523,9 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         editor.commit();
     }
 
-    public void processVideo() throws FrameGrabber.Exception, InterruptedException {
-        String LOG_TAG = "VideoProcessing";
-
-        //elements required for image processing
-        int[] numCycles = new int[2];
-        int[] dirChange = new int[2];
-        int[] minPeak = {10000, 10000};
-        int[] maxPeak = {0, 0};
-        boolean finishedTest = false;
-        String[] dirY = new String[2];
-        boolean[] movingY = new boolean[2];
-        ArrayDeque<int[]> movingWindow = new ArrayDeque<>();
-        List<Integer> amplitudesL = new ArrayList<>();
-        List<Integer> amplitudesR = new ArrayList<>();
-        int[] centroidPoints = new int[2];
-        String[] dirYprev = new String[2];
-
-        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(savePath.getAbsolutePath());
-        OpenCVFrameConverter.ToMat toMatConverter = new OpenCVFrameConverter.ToMat();
-
-        // Open video file
-        grabber.start();
-
-        long delay = Math.round(1000d / grabber.getFrameRate());
-
-        // Read frame by frame
-        Frame frame;
-        while ((frame = grabber.grab()) != null) {
-            Mat mRgba = toMatConverter.convert(frame);
-            MatVector contours[] = new MatVector[2];
-
-            for (int k = 0; k < 2; k++) {
-                contours[k] = mDetectorList.get(k).getContours();
-
-                mDetectorList.get(k).process(mRgba, pxscale);
-
-                Log.d(TAG, "Contours count: " + contours[k].size());
-
-                //get bounding rectangle
-                RotatedRect rect = minAreaRect(contours[k].get(0));
-
-                double boundWidth = rect.size().width();
-                double boundHeight = rect.size().height();
-                int boundPos = 0;
-
-                //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
-                for (int i = 1; i < contours[k].size(); i++) {
-                    rect = minAreaRect(contours[k].get(i));
-                    if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
-                        boundWidth = rect.size().width();
-                        boundHeight = rect.size().height();
-                        //store the location in the contour list of the maximum area bounding rectangle
-                        boundPos = i;
-                    }
-                }
-
-                //create a new bounding rectangle from the largest contour area
-                Rect boundRect = boundingRect(contours[k].get(boundPos));
-                rectangle(mRgba, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
-
-                //get centroids of the bounding contour
-                Moments mc = moments(contours[k].get(boundPos), false);
-                int centroidx = (int) (mc.m10() / mc.m00());
-                int centroidy = (int) (mc.m01() / mc.m00());
-                centroidPoints[k] = centroidy;
-            }
-
-            if (contours[0].size() > 0 && contours[1].size() > 0) {
-                movingWindow.addFirst(centroidPoints);
-                if (movingWindow.size() > 5) {
-                    movingWindow.removeLast();     //limit size of deque to 30
-                }
-
-                //track y-direction movement of centre of object
-                if (movingWindow.size() >= 5) {
-                    for (int k = 0; k < 2; k++) {
-                        int dY = movingWindow.getLast()[k] - movingWindow.getFirst()[k];
-                        Log.i(TAG, "dY: " + dY);
-                        if (abs(dY) > 100) {         //ensure significant movement
-                            int sign = Integer.signum(dY);
-                            if (sign == 1) {
-                                dirYprev[k] = dirY[k];
-                                dirY[k] = "Up";
-                            } else {
-                                dirYprev[k] = dirY[k];
-                                dirY[k] = "Down";
-                            }
-                            if (dirY[k] != dirYprev[k]) {
-                                dirChange[k]++;
-                            }
-                            movingY[k] = true;
-                            Log.i(TAG, "Moving " + dirY[k]);
-                        } else {
-                            movingY[k] = false;
-                            Log.i(TAG, "Not Moving");
-                        }
-
-                        //check if centroidy is a max or min peak of current cycle
-                        if (centroidPoints[k] > maxPeak[k])
-                            maxPeak[k] = centroidPoints[k];
-                        if (centroidPoints[k] < minPeak[k])
-                            minPeak[k] = centroidPoints[k];
-
-                        //reset min/max peak after each cycle
-                        if (dirChange[k] != 0 && dirChange[k] % 2 == 0) {
-                            dirChange[k] = 0;
-                            numCycles[k]++;
-                            if (k == 0) {
-                                amplitudesL.add(maxPeak[k] - minPeak[k]);
-                            } else {
-                                amplitudesR.add(maxPeak[k] - minPeak[k]);
-                            }
-                            minPeak[k] = 10000;
-                            maxPeak[k] = 0;
-                        }
-                    }
-                }
-
-                Log.i(TAG, "numCycles left: " + numCycles[0]);
-                Log.i(TAG, "numCycles right: " + numCycles[1]);
-                //display results once 10 cycles completed
-                if (numCycles[0] >= 10 && numCycles[1] >= 10 && !finishedTest) {
-                    for (int amp : amplitudesR) {
-                        Log.i(TAG, "Right hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0]);
-                    }
-                    for (int amp : amplitudesL) {
-                        Log.i(TAG, "Left hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0]);
-                    }
-                    finishedTest = true;
-                }
-            }
-            imshow("bimanual_test", mRgba);
-
-            // Delay
-            Thread.sleep(delay);
-        }
-
-        // Close the video file
-        grabber.release();
-    }
-
     public void buttonProcess(View view) {
-        //TODO - check that saved file exists
-        //code here
-
-        try {
-            processVideo();
-        } catch (InterruptedException e) {
-            //TODO - handle exception
-        } catch (FrameGrabber.Exception e) {
-            //TODO - handle exception
-        }
+        VideoProcessor vidProcessor = new VideoProcessor(this, savePath.getAbsolutePath(), pxscale, mDetectorList);
+        vidProcessor.execute();
     }
 
     public void updateLeftButtonColor() {
