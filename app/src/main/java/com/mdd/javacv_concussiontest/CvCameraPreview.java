@@ -133,7 +133,7 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
     private SurfaceTexture surfaceTexture;
     private int frameWidth, frameHeight;
     private int scaleType = SCALE_FIT;
-    private int measuredW, measuredH;
+    private int previewWidth, previewHeight;
 
     public CvCameraPreview(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -338,6 +338,8 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int height = MeasureSpec.getSize(heightMeasureSpec);
         int width = MeasureSpec.getSize(widthMeasureSpec);
+        previewWidth = width;
+        previewHeight = height;
 
         // do some ultra high precision math...
         float expectedRatio = height > width ? ASPECT_RATIO_H / ASPECT_RATIO_W : ASPECT_RATIO_W / ASPECT_RATIO_H;
@@ -356,15 +358,13 @@ public class CvCameraPreview extends SurfaceView implements SurfaceHolder.Callba
             }
         }
 
-        measuredW = width;
-        measuredH = height;
         setMeasuredDimension(width, height);
         Log.i(LOG_TAG, "onMeasure(): set surface dimension to " + width + "x" + height);
     }
 
-    public int getPictureWidth() {return measuredW;}
+    public int getPreviewWidth() {return previewWidth;}
 
-    public int getPictureHeight() {return measuredH;}
+    public int getPreviewHeight() {return previewHeight;}
 
     private boolean connectCamera() {
         /* 1. We need to instantiate camera

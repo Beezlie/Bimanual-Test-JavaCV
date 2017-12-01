@@ -2,14 +2,18 @@ package com.mdd.javacv_concussiontest;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.hardware.Camera;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.PowerManager;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -21,6 +25,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
 import org.bytedeco.javacpp.DoublePointer;
@@ -31,26 +36,40 @@ import org.bytedeco.javacpp.indexer.UByteIndexer;
 import org.bytedeco.javacpp.indexer.UByteRawIndexer;
 import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacpp.opencv_core.Mat;
+import org.bytedeco.javacpp.opencv_core.MatVector;
 import org.bytedeco.javacpp.opencv_core.Rect;
+import org.bytedeco.javacpp.opencv_core.RotatedRect;
+import org.bytedeco.javacpp.opencv_core.Moments;
 import org.bytedeco.javacpp.opencv_core.Scalar;
+import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.FFmpegFrameRecorder;
 import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.FrameRecorder;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
+import static android.content.ContentValues.TAG;
+import static java.lang.Math.abs;
 import static org.bytedeco.javacpp.avcodec.AV_CODEC_ID_MPEG4;
 import static org.bytedeco.javacpp.opencv_core.CV_8UC3;
 import static org.bytedeco.javacpp.opencv_core.CV_8UC4;
 import static org.bytedeco.javacpp.opencv_core.CV_64F;
 import static org.bytedeco.javacpp.opencv_core.sumElems;
+import static org.bytedeco.javacpp.opencv_highgui.imshow;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_HSV2RGB_FULL;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
+import static org.bytedeco.javacpp.opencv_imgproc.boundingRect;
 import static org.bytedeco.javacpp.opencv_imgproc.cvCvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
+import static org.bytedeco.javacpp.opencv_imgproc.minAreaRect;
+import static org.bytedeco.javacpp.opencv_imgproc.moments;
+import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 import static org.bytedeco.javacpp.opencv_imgproc.resize;
 
 public class RecordActivity extends Activity implements OnClickListener, View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
@@ -71,6 +90,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     private Mat mRgba;
     private Mat mSpectrum = new Mat();
     private opencv_core.Size SPECTRUM_SIZE = new opencv_core.Size(200, 64);
+    private Scalar CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
     private Scalar mBlobColorHsv = new Scalar(255);
     private Scalar mBlobColorRgba = new Scalar(255);
     private boolean[] mIsColorSelected = new boolean[2];
@@ -79,6 +99,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     private ColorBlobDetector mDetectorR = new ColorBlobDetector();
     private List<ColorBlobDetector> mDetectorList = new ArrayList<>();
     private int selector = 0;
+    private double pxscale = 1;
     private int xTouch, yTouch;
     private String hexcolor;
     private Button leftButton;
@@ -311,9 +332,10 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
             stopRecording();
             recording = false;
             Log.w(LOG_TAG, "Stop Button Pushed");
-//            btnRecorderControl.setText("Start");
             btnRecorderControl.setVisibility(View.GONE);
             Toast.makeText(this, "Video file was saved to \"" + savePath + "\"", Toast.LENGTH_LONG).show();
+            //saveParams();
+
         }
     }
 
@@ -367,8 +389,12 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         int cols = mRgba.cols();
         int rows = mRgba.rows();
 
-        int xOffset = (cameraView.getPictureWidth() - cols) / 2;
-        int yOffset = (cameraView.getPictureHeight() - rows) / 2;
+        int w = cameraView.getWidth();
+        int h = cameraView.getHeight();
+        int a = cameraView.getPreviewWidth();
+        int b = cameraView.getPreviewHeight();
+        int xOffset = (cameraView.getPreviewWidth() - cols) / 2;
+        int yOffset = (cameraView.getPreviewHeight() - rows) / 2;
 
         //TODO fix incorrect calculation of x and y - need to scale xTouch and yTouch so x and y are within the matrix dimens
         int x = xTouch- xOffset;
@@ -442,7 +468,6 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
 
     private Scalar convertScalarHsv2Rgba(Scalar hsvColor) {
         Mat pointMatRgba = new Mat(1, 1, CV_8UC3);
-        ///TODO FIND OUT WHY THE LINE BELOW DOESNT WORK AND FIX IT - IT CAUSES COLOR DETECTION TO NOT WORK
         //TODO Fix the fact that color doesnt set properly
         DoublePointer dp = new DoublePointer(hsvColor.get(0), hsvColor.get(1), hsvColor.get(2), hsvColor.get(3));
         Mat pointMatHsv = new Mat(1, 1, CV_8UC3, dp);
@@ -457,6 +482,196 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         Scalar result = new Scalar(r, g, b, 0);
 
         return result;
+    }
+
+
+    public int pxToDistance() {
+        //f_x = f * m_x
+        //f_y = f * m_y
+        //solve for mx and my
+
+        //return focal_mm / sensor_width_mm;
+        return 1;
+    }
+
+    public void saveParams() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        editor.putInt("pxscale", pxToDistance());
+
+        //TODO - figure out how to get threshold values to save to shared prefs
+        /*
+        String s;
+        Scalar bound;
+        bound = mDetectorL.getLowerBound();
+        double output[] = {bound.get(0), bound.get(1), bound.get(2), bound.get(3)};
+        s = Arrays.toString(output);
+        s = s.substring(1, s.length() - 1);
+        String[] s_array = s.split(", ");
+        editor.putStringSet("left_lower_bound", s_array);
+
+        editor.putString("right_lower_bound", json);
+
+        editor.putString("left_upper_bound", json);
+
+        editor.putString("right_upper_bound", json);
+        */
+        editor.commit();
+    }
+
+    public void processVideo() throws FrameGrabber.Exception, InterruptedException {
+        String LOG_TAG = "VideoProcessing";
+
+        //elements required for image processing
+        int[] numCycles = new int[2];
+        int[] dirChange = new int[2];
+        int[] minPeak = {10000, 10000};
+        int[] maxPeak = {0, 0};
+        boolean finishedTest = false;
+        String[] dirY = new String[2];
+        boolean[] movingY = new boolean[2];
+        ArrayDeque<int[]> movingWindow = new ArrayDeque<>();
+        List<Integer> amplitudesL = new ArrayList<>();
+        List<Integer> amplitudesR = new ArrayList<>();
+        int[] centroidPoints = new int[2];
+        String[] dirYprev = new String[2];
+
+        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(savePath.getAbsolutePath());
+        OpenCVFrameConverter.ToMat toMatConverter = new OpenCVFrameConverter.ToMat();
+
+        // Open video file
+        grabber.start();
+
+        long delay = Math.round(1000d / grabber.getFrameRate());
+
+        // Read frame by frame
+        Frame frame;
+        while ((frame = grabber.grab()) != null) {
+            Mat mRgba = toMatConverter.convert(frame);
+            MatVector contours[] = new MatVector[2];
+
+            for (int k = 0; k < 2; k++) {
+                contours[k] = mDetectorList.get(k).getContours();
+
+                mDetectorList.get(k).process(mRgba, pxscale);
+
+                Log.d(TAG, "Contours count: " + contours[k].size());
+
+                //get bounding rectangle
+                RotatedRect rect = minAreaRect(contours[k].get(0));
+
+                double boundWidth = rect.size().width();
+                double boundHeight = rect.size().height();
+                int boundPos = 0;
+
+                //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
+                for (int i = 1; i < contours[k].size(); i++) {
+                    rect = minAreaRect(contours[k].get(i));
+                    if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
+                        boundWidth = rect.size().width();
+                        boundHeight = rect.size().height();
+                        //store the location in the contour list of the maximum area bounding rectangle
+                        boundPos = i;
+                    }
+                }
+
+                //create a new bounding rectangle from the largest contour area
+                Rect boundRect = boundingRect(contours[k].get(boundPos));
+                rectangle(mRgba, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
+
+                //get centroids of the bounding contour
+                Moments mc = moments(contours[k].get(boundPos), false);
+                int centroidx = (int) (mc.m10() / mc.m00());
+                int centroidy = (int) (mc.m01() / mc.m00());
+                centroidPoints[k] = centroidy;
+            }
+
+            if (contours[0].size() > 0 && contours[1].size() > 0) {
+                movingWindow.addFirst(centroidPoints);
+                if (movingWindow.size() > 5) {
+                    movingWindow.removeLast();     //limit size of deque to 30
+                }
+
+                //track y-direction movement of centre of object
+                if (movingWindow.size() >= 5) {
+                    for (int k = 0; k < 2; k++) {
+                        int dY = movingWindow.getLast()[k] - movingWindow.getFirst()[k];
+                        Log.i(TAG, "dY: " + dY);
+                        if (abs(dY) > 100) {         //ensure significant movement
+                            int sign = Integer.signum(dY);
+                            if (sign == 1) {
+                                dirYprev[k] = dirY[k];
+                                dirY[k] = "Up";
+                            } else {
+                                dirYprev[k] = dirY[k];
+                                dirY[k] = "Down";
+                            }
+                            if (dirY[k] != dirYprev[k]) {
+                                dirChange[k]++;
+                            }
+                            movingY[k] = true;
+                            Log.i(TAG, "Moving " + dirY[k]);
+                        } else {
+                            movingY[k] = false;
+                            Log.i(TAG, "Not Moving");
+                        }
+
+                        //check if centroidy is a max or min peak of current cycle
+                        if (centroidPoints[k] > maxPeak[k])
+                            maxPeak[k] = centroidPoints[k];
+                        if (centroidPoints[k] < minPeak[k])
+                            minPeak[k] = centroidPoints[k];
+
+                        //reset min/max peak after each cycle
+                        if (dirChange[k] != 0 && dirChange[k] % 2 == 0) {
+                            dirChange[k] = 0;
+                            numCycles[k]++;
+                            if (k == 0) {
+                                amplitudesL.add(maxPeak[k] - minPeak[k]);
+                            } else {
+                                amplitudesR.add(maxPeak[k] - minPeak[k]);
+                            }
+                            minPeak[k] = 10000;
+                            maxPeak[k] = 0;
+                        }
+                    }
+                }
+
+                Log.i(TAG, "numCycles left: " + numCycles[0]);
+                Log.i(TAG, "numCycles right: " + numCycles[1]);
+                //display results once 10 cycles completed
+                if (numCycles[0] >= 10 && numCycles[1] >= 10 && !finishedTest) {
+                    for (int amp : amplitudesR) {
+                        Log.i(TAG, "Right hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0]);
+                    }
+                    for (int amp : amplitudesL) {
+                        Log.i(TAG, "Left hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0]);
+                    }
+                    finishedTest = true;
+                }
+            }
+            imshow("bimanual_test", mRgba);
+
+            // Delay
+            Thread.sleep(delay);
+        }
+
+        // Close the video file
+        grabber.release();
+    }
+
+    public void buttonProcess(View view) {
+        //TODO - check that saved file exists
+        //code here
+
+        try {
+            processVideo();
+        } catch (InterruptedException e) {
+            //TODO - handle exception
+        } catch (FrameGrabber.Exception e) {
+            //TODO - handle exception
+        }
     }
 
     public void updateLeftButtonColor() {

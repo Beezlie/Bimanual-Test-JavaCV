@@ -51,4 +51,13 @@
         android:textColor="#ff0000"
         android:text="Tap each hand to set color selection before recording" />
 
+    <Button
+        android:id="@+id/process"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/left_color"
+        android:onClick="buttonProcess"
+        android:text="Process" />
+
 </RelativeLayout>
