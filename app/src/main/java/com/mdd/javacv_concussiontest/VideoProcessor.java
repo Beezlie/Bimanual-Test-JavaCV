@@ -8,26 +8,10 @@ import android.util.Log;
 
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
-import static android.content.ContentValues.TAG;
-import static java.lang.Math.abs;
-import static org.bytedeco.javacpp.opencv_core.CV_8UC4;
-import static org.bytedeco.javacpp.opencv_core.Point;
-import static org.bytedeco.javacpp.opencv_core.Scalar;
-import static org.bytedeco.javacpp.opencv_core.Size;
-import static org.bytedeco.javacpp.opencv_imgproc.*;
-import static org.bytedeco.javacpp.opencv_core.Mat;
-import static org.bytedeco.javacpp.opencv_core.Rect;
-import static org.bytedeco.javacpp.opencv_core.RotatedRect;
-import static org.bytedeco.javacpp.opencv_core.MatVector;
-import static org.bytedeco.javacpp.opencv_core.inRange;
-import static org.bytedeco.javacpp.opencv_core.multiply;
-import static org.bytedeco.javacpp.opencv_core.Moments;
-import static org.bytedeco.javacpp.opencv_imgproc.moments;
-import static org.bytedeco.javacpp.opencv_highgui.*;
-
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
+import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
 import java.io.File;
@@ -37,6 +21,18 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+import static android.content.ContentValues.TAG;
+import static java.lang.Math.abs;
+import static org.bytedeco.javacpp.opencv_core.CvRect;
+import static org.bytedeco.javacpp.opencv_core.CvSeq;
+import static org.bytedeco.javacpp.opencv_core.IplImage;
+import static org.bytedeco.javacpp.opencv_core.Scalar;
+import static org.bytedeco.javacpp.opencv_imgproc.CvMoments;
+import static org.bytedeco.javacpp.opencv_imgproc.cvBoundingRect;
+import static org.bytedeco.javacpp.opencv_imgproc.cvGetCentralMoment;
+import static org.bytedeco.javacpp.opencv_imgproc.cvGetSpatialMoment;
+import static org.bytedeco.javacpp.opencv_imgproc.cvMoments;
+
 public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private Activity activity;
     private ProgressDialog asyncDialog;
@@ -44,7 +40,7 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private final double pxscale;
     private FFmpegFrameGrabber grabber;
     private Exception exception;
-    private OpenCVFrameConverter.ToMat toMatConverter;
+    private OpenCVFrameConverter.ToIplImage toIplConverter;
     private Frame frame;
     private Scalar CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
     private int[] numCycles = new int[2];
@@ -80,7 +76,7 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
         asyncDialog.show();
 
         grabber = new FFmpegFrameGrabber(filename);
-        toMatConverter = new OpenCVFrameConverter.ToMat();
+        toIplConverter = new OpenCVFrameConverter.ToIplImage();
 
         root = new File(Environment.getExternalStorageDirectory().toString());
         datafile = new File(root, "data.txt");
@@ -114,32 +110,36 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                 }
                 // process the frame
 
-                Mat mRgba = toMatConverter.convert(frame);
-                MatVector contours[] = new MatVector[2];
+                IplImage img = toIplConverter.convert(frame);
+                CvSeq contours[] = new CvSeq[2];
 
                 for (int k = 0; k < 2; k++) {
-                    contours[k] = mDetectorList.get(k).getContours();
+                    contours[k] = mDetectorList.get(k).getLargestContour();
 
                     try {
-                        mDetectorList.get(k).process(mRgba, pxscale);
+                        mDetectorList.get(k).process(img);
                     } catch (InterruptedException e) {
                         exception = e;
                     }
 
-                    Log.d(TAG, "Contours count: " + contours[k].size());
-                    if (contours[k].size() <= 0) {
+                    //TODO - make sure the .total() is doing what I think its doing (getting total # elements)
+                    Log.d(TAG, "Contours count: " + contours[k].total());
+                    if (contours[k].total() <= 0) {
                         break;
                     }
 
-                    //get bounding rectangle
-                    RotatedRect rect = minAreaRect(contours[k].get(0));
+                    centroidPoints[k] = mDetectorList.get(k).getYCentroid();
 
+                    //get bounding rectangle
+                    /*
+                    RotatedRect rect = minAreaRect(contours[k].get(0));
                     double boundWidth = rect.size().width();
                     double boundHeight = rect.size().height();
                     int boundPos = 0;
 
+
                     //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
-                    for (int i = 1; i < contours[k].size(); i++) {
+                    for (int i = 1; i < contours[k].total(); i++) {
                         rect = minAreaRect(contours[k].get(i));
                         if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
                             boundWidth = rect.size().width();
@@ -149,18 +149,33 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                         }
                     }
 
+
                     //create a new bounding rectangle from the largest contour area
                     Rect boundRect = boundingRect(contours[k].get(boundPos));
                     rectangle(mRgba, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
 
                     //get centroids of the bounding contour
-                    Moments mc = moments(contours[k].get(boundPos), false);
+                    Moments mc = cvMoments(contours[k].get(boundPos), false);
                     int centroidx = (int) (mc.m10() / mc.m00());
                     int centroidy = (int) (mc.m01() / mc.m00());
                     centroidPoints[k] = centroidy;
+
+
+                    CvRect boundRect = cvBoundingRect(contours[k]);
+                    int centroidX = 0;
+                    int centroidY = 0;
+                    CvMoments moments = new CvMoments();
+                    cvMoments(contours[k], moments);
+                    double mom10 = cvGetSpatialMoment(moments, 1, 0);
+                    double mom01 = cvGetSpatialMoment(moments, 0, 1);
+                    double area = cvGetCentralMoment(moments, 0, 0);
+                    centroidX = (int) (mom10 / area);
+                    centroidY = (int) (mom01 / area);
+                    centroidPoints[k] = centroidY;
+                    */
                 }
 
-                if (contours[0].size() > 0 && contours[1].size() > 0) {
+                if (contours[0].total() > 0 && contours[1].total() > 0) {
                     movingWindow.addFirst(centroidPoints);
                     if (movingWindow.size() > 5) {
                         movingWindow.removeLast();     //limit size of deque to 30
@@ -272,6 +287,10 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
         asyncDialog.dismiss();
 
         super.onPostExecute(result);
+    }
+
+    protected void dismissDialog() {
+        asyncDialog.dismiss();
     }
 }
 
