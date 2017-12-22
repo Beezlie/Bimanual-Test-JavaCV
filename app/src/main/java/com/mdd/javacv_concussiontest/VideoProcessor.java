@@ -11,7 +11,6 @@ import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
-import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
 import java.io.File;
@@ -27,11 +26,7 @@ import static org.bytedeco.javacpp.opencv_core.CvRect;
 import static org.bytedeco.javacpp.opencv_core.CvSeq;
 import static org.bytedeco.javacpp.opencv_core.IplImage;
 import static org.bytedeco.javacpp.opencv_core.Scalar;
-import static org.bytedeco.javacpp.opencv_imgproc.CvMoments;
-import static org.bytedeco.javacpp.opencv_imgproc.cvBoundingRect;
-import static org.bytedeco.javacpp.opencv_imgproc.cvGetCentralMoment;
-import static org.bytedeco.javacpp.opencv_imgproc.cvGetSpatialMoment;
-import static org.bytedeco.javacpp.opencv_imgproc.cvMoments;
+import static org.bytedeco.javacpp.opencv_imgproc.*;
 
 public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private Activity activity;
@@ -48,6 +43,8 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private int[] minPeak = {10000, 10000};
     private int[] maxPeak = {0, 0};
     private int[] centroidPoints = new int[2];
+    private int[] boundRectTL = new int[2];
+    private int[] boundRectBR = new int[2];
     private boolean finishedTest = false;
     private String[] dirY = new String[2];
     private String[] dirYprev = new String[2];
@@ -108,21 +105,22 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                     Log.d(TAG, "EMPTY IMAGE: " + f);
                     continue;
                 }
-                // process the frame
 
+                // process the frame
                 IplImage img = toIplConverter.convert(frame);
                 CvSeq contours[] = new CvSeq[2];
 
                 for (int k = 0; k < 2; k++) {
-                    contours[k] = mDetectorList.get(k).getLargestContour();
-
                     try {
                         mDetectorList.get(k).process(img);
                     } catch (InterruptedException e) {
                         exception = e;
                     }
 
+                    contours[k] = mDetectorList.get(k).getLargestContour();
+
                     //TODO - make sure the .total() is doing what I think its doing (getting total # elements)
+                    int s = contours[k].elem_size();
                     Log.d(TAG, "Contours count: " + contours[k].total());
                     if (contours[k].total() <= 0) {
                         break;
@@ -149,30 +147,20 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                         }
                     }
 
-
                     //create a new bounding rectangle from the largest contour area
                     Rect boundRect = boundingRect(contours[k].get(boundPos));
                     rectangle(mRgba, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
-
-                    //get centroids of the bounding contour
-                    Moments mc = cvMoments(contours[k].get(boundPos), false);
-                    int centroidx = (int) (mc.m10() / mc.m00());
-                    int centroidy = (int) (mc.m01() / mc.m00());
-                    centroidPoints[k] = centroidy;
-
-
-                    CvRect boundRect = cvBoundingRect(contours[k]);
-                    int centroidX = 0;
-                    int centroidY = 0;
-                    CvMoments moments = new CvMoments();
-                    cvMoments(contours[k], moments);
-                    double mom10 = cvGetSpatialMoment(moments, 1, 0);
-                    double mom01 = cvGetSpatialMoment(moments, 0, 1);
-                    double area = cvGetCentralMoment(moments, 0, 0);
-                    centroidX = (int) (mom10 / area);
-                    centroidY = (int) (mom01 / area);
-                    centroidPoints[k] = centroidY;
                     */
+                    CvRect boundRect = cvBoundingRect(contours[k]);
+                    try {
+                        String result = "Bounding box " + k + ": x - " + boundRect.x() + ", y - " +
+                                boundRect.y() + ", y - " + boundRect.width() + ", y - " + boundRect.height();
+                        Log.i(TAG, result);
+                        writer.append(result);
+                    } catch (IOException e) {
+                        exception = e;
+                    }
+
                 }
 
                 if (contours[0].total() > 0 && contours[1].total() > 0) {

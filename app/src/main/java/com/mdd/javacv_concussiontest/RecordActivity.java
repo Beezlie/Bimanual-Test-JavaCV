@@ -71,13 +71,10 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     private final Object semaphore = new Object();
 
     //Color Detection global variables
-    private Mat mRgba;
-    private Mat mSpectrum = new Mat();
     private opencv_core.Size SPECTRUM_SIZE = new opencv_core.Size(200, 64);
     private Scalar CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
     private Scalar mBlobColorHsv = new Scalar(255);
     private CvScalar mBlobColorRgba = new CvScalar(255);
-    //private Scalar mBlobColorRgba = new Scalar(255);
     private boolean[] mIsColorSelected = new boolean[2];
     private boolean screenTouched = false;
     private ColorBlobDetector mDetectorL = new ColorBlobDetector();
@@ -89,20 +86,9 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     private String hexcolor;
     private Button leftButton;
     private Button rightButton;
+    private Button processButton;
     private final Handler mHandler = new Handler();
     private VideoProcessor vidProcessor;
-
-    final Runnable mUpdateLeftButton = new Runnable() {
-        public void run() {
-            updateLeftButtonColor();
-        }
-    };
-
-    final Runnable mUpdateRightButton = new Runnable() {
-        public void run() {
-            updateRightButtonColor();
-        }
-    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -116,6 +102,8 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
         leftButton = (Button) findViewById(R.id.left_color);
         rightButton = (Button) findViewById(R.id.right_color);
+        processButton = (Button) findViewById(R.id.process);
+        processButton.setVisibility(View.GONE);
 
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, CLASS_LABEL);
@@ -311,27 +299,30 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
 
     @Override
     public void onClick(View v) {
-        if (!recording) {
-            startRecording();
-            recording = true;
-            Log.w(LOG_TAG, "Start Button Pushed");
-            btnRecorderControl.setText("Stop");
-            btnRecorderControl.setBackgroundResource(R.drawable.bg_red_circle_button);
+        if (mIsColorSelected[0] && mIsColorSelected[1]) {
+            if (!recording) {
+                startRecording();
+                recording = true;
+                Log.w(LOG_TAG, "Start Button Pushed");
+                btnRecorderControl.setText("Stop");
+                btnRecorderControl.setBackgroundResource(R.drawable.bg_red_circle_button);
+            } else {
+                // This will trigger the audio recording loop to stop and then set isRecorderStart = false;
+                stopRecording();
+                recording = false;
+                Log.w(LOG_TAG, "Stop Button Pushed");
+                btnRecorderControl.setVisibility(View.GONE);
+                processButton.setVisibility(View.VISIBLE);
+                Toast.makeText(this, "Video file was saved to \"" + savePath + "\"", Toast.LENGTH_LONG).show();
+                //saveParams();
+            }
         } else {
-            // This will trigger the audio recording loop to stop and then set isRecorderStart = false;
-            stopRecording();
-            recording = false;
-            Log.w(LOG_TAG, "Stop Button Pushed");
-            btnRecorderControl.setVisibility(View.GONE);
-            Toast.makeText(this, "Video file was saved to \"" + savePath + "\"", Toast.LENGTH_LONG).show();
-            //saveParams();
-
+            Toast.makeText(this, "Must select objects first", Toast.LENGTH_LONG).show();
         }
     }
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        mRgba = new Mat(height, width, CV_8UC4);
         mDetectorList.add(mDetectorL);
         mDetectorList.add(mDetectorR);
         initRecorder(width, height);
@@ -346,9 +337,11 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     public Mat onCameraFrame(Mat mat) {
         if (screenTouched) {
             screenTouched = false;
+            Mat mRgba = new Mat(mat.rows(), mat.cols(), CV_8UC4);
             mat.copyTo(mRgba);
             GetPixelColor color = new GetPixelColor(mRgba, xTouch, yTouch);
             mHandler.post(color);
+            mRgba.release();
         }
 
         if (recording && mat != null) {
@@ -375,90 +368,6 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         screenTouched = true;
 
         return false; // don't need subsequent touch events
-    }
-
-    private void getPixelColor(Mat mat, int xTouch, int yTouch) {
-        int cols = mRgba.cols();
-        int rows = mRgba.rows();
-
-        //test lines - remove after
-        int w = cameraView.getWidth();
-        int h = cameraView.getHeight();
-        int a = cameraView.getPreviewWidth();
-        int b = cameraView.getPreviewHeight();
-
-        int xOffset = (cameraView.getPreviewWidth() - cols) / 2;
-        int yOffset = (cameraView.getPreviewHeight() - rows) / 2;
-
-        //TODO fix incorrect calculation of x and y - need to scale xTouch and yTouch so x and y are within the matrix dimens
-        int x = xTouch- xOffset;
-        int y = yTouch - yOffset;
-
-        Log.i(LOG_TAG, "Touched image coordinates: (" + x + ", " + y + ")");
-
-        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) {
-            screenTouched = false;
-            return;
-        }
-
-        Rect touchedRect = new Rect();
-
-        int tmpx = (x>5) ? x-5 : 0;
-        int tmpy = (y>5) ? y-5 : 0;
-        touchedRect.x(tmpx);// = (x>5) ? x-5 : 0;
-        touchedRect.y(tmpy);// = (y>5) ? y-5 : 0;
-
-        int tmpw = (x+5 < cols) ? x + 5 - touchedRect.x() : cols - touchedRect.x();
-        int tmph = (y+5 < rows) ? y + 5 - touchedRect.y() : rows - touchedRect.y();
-        touchedRect.width(tmpw);
-        touchedRect.height(tmph);
-
-        // Calculate average hsv color of touched region
-        Mat touchedRegionRgba = new Mat(mRgba, touchedRect);
-        Mat touchedRegionHsv = new Mat();
-        cvtColor(touchedRegionRgba, touchedRegionHsv, COLOR_RGB2HSV_FULL);
-        mBlobColorHsv = sumElems(touchedRegionHsv);
-        int pointCount = touchedRect.width()*touchedRect.height();
-        for (int i = 0; i < 3; i++) {
-            mBlobColorHsv.put(i, mBlobColorHsv.get(i) / pointCount);
-        }
-
-        //get Rgba values
-        IplImage src = new IplImage(mRgba);
-        mBlobColorRgba = cvGet2D(src, y, x);
-
-        int red = (int)mBlobColorRgba.get(0);
-        int green = (int)mBlobColorRgba.get(1);
-        int blue = (int)mBlobColorRgba.get(2);
-        int alpha = (int)mBlobColorRgba.get(3);
-        hexcolor = String.format("#%02x%02x%02x", red, green, blue);
-        Log.i(LOG_TAG, "Touched rgba color: (" + hexcolor + ")");
-        Log.i(LOG_TAG, "red: (" + red + ")");
-        Log.i(LOG_TAG, "green: (" + green + ")");
-        Log.i(LOG_TAG, "blue: (" + blue + ")");
-        Log.i(LOG_TAG, "alpha: (" + alpha + ")");
-
-        //set the colour of one of the buttons to the rgba colour selected
-        /*
-        if (selector == 0) {
-            mHandler.post(mUpdateLeftButton);
-            //leftButton.setBackgroundColor(Color.parseColor(hexcolor));
-        } else {
-            mHandler.post(mUpdateRightButton);
-        }
-        */
-
-        mDetectorList.get(selector).setHsvColor(mBlobColorHsv);
-        mIsColorSelected[selector] = true;
-        selector ^= 1;
-
-        screenTouched = false;
-
-        Log.i(LOG_TAG, "release temp mem");
-        src.release();
-        touchedRegionRgba.release();
-        touchedRegionHsv.release();
-        Log.i(LOG_TAG, "mem released");
     }
 
     public int pxToDistance() {
@@ -501,7 +410,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
         private int xPoint;
         private int yPoint;
         public GetPixelColor(Mat _mat, int _xTouch, int _yTouch) {
-            this.mat = _mat;
+            this.mat = _mat.clone();
             this.xPoint = _xTouch;
             this.yPoint = _yTouch;
         }
@@ -543,6 +452,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
             touchedRect.width(tmpw);
             touchedRect.height(tmph);
 
+
             // Calculate average hsv color of touched region
             Mat touchedRegionRgba = new Mat(mat, touchedRect);
             Mat touchedRegionHsv = new Mat();
@@ -569,12 +479,14 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
             Log.i(LOG_TAG, "alpha: (" + alpha + ")");
 
             //set the colour of one of the buttons to the rgba colour selected
-            if (selector == 0) {
-                //mHandler.post(mUpdateLeftButton);
-                leftButton.setBackgroundColor(Color.parseColor(hexcolor));
-            } else {
-                //mHandler.post(mUpdateRightButton);
-                rightButton.setBackgroundColor(Color.parseColor(hexcolor));
+            synchronized (semaphore) {
+                if (selector == 0) {
+                    //mHandler.post(mUpdateLeftButton);
+                    leftButton.setBackgroundColor(Color.parseColor(hexcolor));
+                } else {
+                    //mHandler.post(mUpdateRightButton);
+                    rightButton.setBackgroundColor(Color.parseColor(hexcolor));
+                }
             }
 
             mDetectorList.get(selector).setHsvColor(mBlobColorHsv);
@@ -590,21 +502,8 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     }
 
     public void buttonProcess(View view) {
-        if (mIsColorSelected[0] && mIsColorSelected[1]) {
-            Log.i(LOG_TAG, "Begin video processing");
-            vidProcessor = new VideoProcessor(this, savePath.getAbsolutePath(), pxscale, mDetectorList);
-            vidProcessor.execute();
-        } else {
-            Toast.makeText(this, "Must select objects first", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    public void updateLeftButtonColor() {
-        leftButton.setBackgroundColor(Color.parseColor(hexcolor));
-    }
-
-    public void updateRightButtonColor() {
-        //rightButton.setBackgroundColor(Color.argb(alpha, red, green, blue));
-        rightButton.setBackgroundColor(Color.parseColor(hexcolor));
+        Log.i(LOG_TAG, "Begin video processing");
+        vidProcessor = new VideoProcessor(this, savePath.getAbsolutePath(), pxscale, mDetectorList);
+        vidProcessor.execute();
     }
 }

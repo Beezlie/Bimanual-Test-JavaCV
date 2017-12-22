@@ -32,22 +32,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        findViewById(R.id.btnOpenCv).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (mPermissionReady) {
-                    startActivity(new Intent(MainActivity.this, OpenCvActivity.class));
-                }
-            }
-        });
-        findViewById(R.id.btnProcess).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (mPermissionReady) {
-                    startActivity(new Intent(MainActivity.this, ProcessVideoActivity.class));
-                }
-            }
-        });
         findViewById(R.id.btnCalibrate).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

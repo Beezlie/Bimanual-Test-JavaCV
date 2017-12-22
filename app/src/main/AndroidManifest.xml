@@ -27,14 +27,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".RecordActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".OpenCvActivity"
-            android:screenOrientation="landscape" />
-        <activity android:name=".ProcessVideoActivity" />
-        <activity android:name=".CalibrateActivity"></activity>
+        <activity android:name=".RecordActivity"
+            android:screenOrientation="landscape">
+        </activity>
+        <activity android:name=".CalibrateActivity"
+            android:screenOrientation="landscape">
+        </activity>
     </application>
 
 </manifest>

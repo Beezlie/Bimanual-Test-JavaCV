@@ -23,20 +23,6 @@
         android:text="Record" />
 
     <Button
-        android:id="@+id/btnOpenCv"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="OpenCv" />
-
-    <Button
-        android:id="@+id/btnProcess"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Process Saved Video" />
-
-    <Button
         android:id="@+id/btnCalibrate"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
