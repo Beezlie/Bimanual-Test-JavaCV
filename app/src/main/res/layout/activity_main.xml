@@ -29,4 +29,18 @@
         android:layout_marginTop="8dp"
         android:text="Calibrate" />
 
+    <Button
+        android:id="@+id/btnProcess"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Process" />
+
+    <Button
+        android:id="@+id/btnVideoView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="View Stored Video" />
+
 </LinearLayout>

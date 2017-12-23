@@ -69,6 +69,7 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     private long startTime = 0;
     private OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
     private final Object semaphore = new Object();
+    private final Object colorSem = new Object();
 
     //Color Detection global variables
     private opencv_core.Size SPECTRUM_SIZE = new opencv_core.Size(200, 64);
@@ -336,15 +337,20 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
     @Override
     public Mat onCameraFrame(Mat mat) {
         if (screenTouched) {
-            screenTouched = false;
-            Mat mRgba = new Mat(mat.rows(), mat.cols(), CV_8UC4);
-            mat.copyTo(mRgba);
-            GetPixelColor color = new GetPixelColor(mRgba, xTouch, yTouch);
-            mHandler.post(color);
-            mRgba.release();
+            synchronized (colorSem) {
+                screenTouched = false;
+                Mat mRgba = new Mat(mat.rows(), mat.cols(), CV_8UC4);
+                mat.copyTo(mRgba);
+                GetPixelColor color = new GetPixelColor(mRgba, xTouch, yTouch);
+                mHandler.post(color);
+                mRgba.release();
+            }
         }
 
         if (recording && mat != null) {
+            //TODO - figure out if this synchronization could be messing with another one and causing deadlock
+            //the main problem is when the record button is pressed it seems to get stuck waiting
+            //maybe creating the color picking threads above messes up the timing/synchronization?
             synchronized (semaphore) {
                 try {
                     Frame frame = converterToMat.convert(mat);
@@ -479,14 +485,12 @@ public class RecordActivity extends Activity implements OnClickListener, View.On
             Log.i(LOG_TAG, "alpha: (" + alpha + ")");
 
             //set the colour of one of the buttons to the rgba colour selected
-            synchronized (semaphore) {
-                if (selector == 0) {
-                    //mHandler.post(mUpdateLeftButton);
-                    leftButton.setBackgroundColor(Color.parseColor(hexcolor));
-                } else {
-                    //mHandler.post(mUpdateRightButton);
-                    rightButton.setBackgroundColor(Color.parseColor(hexcolor));
-                }
+            if (selector == 0) {
+                //mHandler.post(mUpdateLeftButton);
+                leftButton.setBackgroundColor(Color.parseColor(hexcolor));
+            } else {
+                //mHandler.post(mUpdateRightButton);
+                rightButton.setBackgroundColor(Color.parseColor(hexcolor));
             }
 
             mDetectorList.get(selector).setHsvColor(mBlobColorHsv);

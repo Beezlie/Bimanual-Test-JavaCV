@@ -8,6 +8,7 @@ import android.util.Log;
 
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
+import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
@@ -36,6 +37,7 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private FFmpegFrameGrabber grabber;
     private Exception exception;
     private OpenCVFrameConverter.ToIplImage toIplConverter;
+    private OpenCVFrameConverter.ToMat toMatConverter;
     private Frame frame;
     private Scalar CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
     private int[] numCycles = new int[2];
@@ -74,6 +76,7 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
 
         grabber = new FFmpegFrameGrabber(filename);
         toIplConverter = new OpenCVFrameConverter.ToIplImage();
+        toMatConverter = new OpenCVFrameConverter.ToMat();
 
         root = new File(Environment.getExternalStorageDirectory().toString());
         datafile = new File(root, "data.txt");
@@ -108,10 +111,12 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
 
                 // process the frame
                 IplImage img = toIplConverter.convert(frame);
+                opencv_core.Mat mat = toMatConverter.convertToMat(frame);
                 CvSeq contours[] = new CvSeq[2];
 
                 for (int k = 0; k < 2; k++) {
                     try {
+                        mDetectorList.get(k).processMat(mat);
                         mDetectorList.get(k).process(img);
                     } catch (InterruptedException e) {
                         exception = e;
@@ -154,7 +159,7 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                     CvRect boundRect = cvBoundingRect(contours[k]);
                     try {
                         String result = "Bounding box " + k + ": x - " + boundRect.x() + ", y - " +
-                                boundRect.y() + ", y - " + boundRect.width() + ", y - " + boundRect.height();
+                                boundRect.y() + ", width - " + boundRect.width() + ", height - " + boundRect.height();
                         Log.i(TAG, result);
                         writer.append(result);
                     } catch (IOException e) {

@@ -1,6 +1,7 @@
 package com.mdd.javacv_concussiontest.utils;
 
 import org.bytedeco.javacpp.Loader;
+import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacpp.opencv_core.CvBox2D;
 import org.bytedeco.javacpp.opencv_core.CvContour;
 import org.bytedeco.javacpp.opencv_core.CvMemStorage;
@@ -9,25 +10,43 @@ import org.bytedeco.javacpp.opencv_core.CvSeq;
 import org.bytedeco.javacpp.opencv_core.CvSize2D32f;
 import org.bytedeco.javacpp.opencv_core.IplImage;
 import org.bytedeco.javacpp.opencv_core.Scalar;
+import org.bytedeco.javacpp.opencv_core.Mat;
+import org.bytedeco.javacpp.opencv_core.MatVector;
 import org.bytedeco.javacv.FrameGrabber;
 
+import static org.bytedeco.javacpp.opencv_core.CV_32SC4;
+import static org.bytedeco.javacpp.opencv_core.cvCloneImage;
 import static org.bytedeco.javacpp.opencv_core.cvCreateImage;
 import static org.bytedeco.javacpp.opencv_core.cvGetSize;
 import static org.bytedeco.javacpp.opencv_core.cvInRangeS;
+import static org.bytedeco.javacpp.opencv_core.cvPoint;
 import static org.bytedeco.javacpp.opencv_core.cvScalar;
 import static org.bytedeco.javacpp.opencv_core.cvSize;
+import static org.bytedeco.javacpp.opencv_core.inRange;
+import static org.bytedeco.javacpp.opencv_imgproc.CHAIN_APPROX_SIMPLE;
+import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_BGR2HSV;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_CHAIN_APPROX_SIMPLE;
+import static org.bytedeco.javacpp.opencv_imgproc.CV_GAUSSIAN;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_MEDIAN;
+import static org.bytedeco.javacpp.opencv_imgproc.CV_RETR_CCOMP;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_RETR_LIST;
 import static org.bytedeco.javacpp.opencv_imgproc.CvMoments;
+import static org.bytedeco.javacpp.opencv_imgproc.GaussianBlur;
+import static org.bytedeco.javacpp.opencv_imgproc.RETR_EXTERNAL;
+import static org.bytedeco.javacpp.opencv_imgproc.contourArea;
+import static org.bytedeco.javacpp.opencv_imgproc.cvBoundingRect;
 import static org.bytedeco.javacpp.opencv_imgproc.cvCvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.cvDilate;
 import static org.bytedeco.javacpp.opencv_imgproc.cvFindContours;
+import static org.bytedeco.javacpp.opencv_imgproc.cvGetCentralMoment;
 import static org.bytedeco.javacpp.opencv_imgproc.cvGetSpatialMoment;
 import static org.bytedeco.javacpp.opencv_imgproc.cvMinAreaRect2;
 import static org.bytedeco.javacpp.opencv_imgproc.cvMoments;
 import static org.bytedeco.javacpp.opencv_imgproc.cvSmooth;
+import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
+import static org.bytedeco.javacpp.opencv_imgproc.dilate;
+import static org.bytedeco.javacpp.opencv_imgproc.findContours;
 
 /**
  * Created by matt on 11/10/17.
@@ -43,8 +62,8 @@ public class ColorBlobDetector {
     private static final float SMALLEST_AREA = 600.0f;
     // Color radius for range checking in HSV color space
     private Scalar mColorRadius = new Scalar(25,50,50,0);
-    //private MatVector mContours = new MatVector();
-    private CvMemStorage storage = CvMemStorage.create();
+    private MatVector mContours = new MatVector();
+    private CvMemStorage mem = CvMemStorage.create();
     private static final double IMG_SCALE = 2;
     private int hueLower, hueUpper, satLower, satUpper, briLower, briUpper;
     private CvSeq largestContour = new CvSeq();
@@ -85,11 +104,14 @@ public class ColorBlobDetector {
         CvScalar hsv_max = cvScalar(hueUpper, satUpper, briUpper, 0);
         cvInRangeS(imgHsv, hsv_min, hsv_max, imgThreshold);
 
-        cvSmooth(imgThreshold, imgThreshold, CV_MEDIAN, 15,0,0,0);
-        IplImage imgDilated = cvCreateImage(cvGetSize(imgThreshold), 8, 1);
-        cvDilate(imgThreshold, imgDilated);
+        cvSmooth(imgThreshold, imgThreshold, CV_GAUSSIAN, 3,3,1,1);
+        //IplImage imgDilated = cvCreateImage(cvGetSize(imgThreshold), 8, 1);
+        //cvDilate(imgThreshold, imgDilated);
 
-        CvSeq bigContour = findBiggestContour(imgDilated);
+        //test code
+        getCoordinates(imgThreshold);
+
+        CvSeq bigContour = findBiggestContour(imgThreshold);
         if (bigContour == null) {
             return;
         }
@@ -100,13 +122,14 @@ public class ColorBlobDetector {
 
     private CvSeq findBiggestContour(IplImage imgThreshed) {
         CvSeq bigContour = null;
+        CvSeq contours = new CvSeq();
 
-        CvSeq contours = new CvSeq(null);
-        cvFindContours(imgThreshed, storage, contours, Loader.sizeof(CvContour.class), CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+        cvFindContours(imgThreshed, mem, contours, Loader.sizeof(CvContour.class) , CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE, cvPoint(0,0));
+
         float maxArea = SMALLEST_AREA;
         while (contours != null && !contours.isNull()) {
             if (contours.elem_size() > 0) {
-                CvBox2D box = cvMinAreaRect2(contours, storage);
+                CvBox2D box = cvMinAreaRect2(contours, mem);
                 if (box != null) {
                     CvSize2D32f size = box.size();
                     float area = size.width() * size.height();
@@ -136,9 +159,65 @@ public class ColorBlobDetector {
         }
     }
 
+    public void processMat(Mat mat) throws FrameGrabber.Exception, InterruptedException {
+        Mat hsv = new Mat();
+        Mat thresh = new Mat();
+
+        GaussianBlur(mat, mat, new opencv_core.Size(3,3), 1);
+
+        cvtColor(mat, hsv, COLOR_RGB2HSV_FULL);
+
+        //E/cv::error(): OpenCV Error: Sizes of input arguments do not match
+        // (The lower bounary is neither an array of the same size and same type as src, nor a scalar)
+        // in void cv::inRange
+        inRange(hsv, new Mat(1, 1, CV_32SC4, new Scalar(hueLower, satLower, briLower, 0)),
+                new Mat(1, 1, CV_32SC4, new Scalar(hueUpper, satUpper, briUpper, 0)), thresh);
+
+        //Mat dilated = new Mat();
+        //dilate(thresh, dilated, new Mat());
+
+        MatVector contours = new MatVector();
+        findContours(thresh, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+        // Find max contour area
+        double maxArea = 0;
+        //iterate over list of contour vectors
+        long j = contours.size();
+        for (int i = 0; i < contours.size(); i++) {
+            //contour - Input vector of 2D points (contour vertices)
+            double area = contourArea(contours.get(i));
+            if (area > maxArea)
+                maxArea = area;
+        }
+
+        // Filter contours by area and resize to fit the original image size
+        MatVector largestContours = new MatVector();
+        for (int i = 0; i < contours.size(); i++) {
+            Mat contour = contours.get(i);
+            if (contourArea(contour) > mMinContourArea*maxArea) {
+                largestContours.put(contour);
+            }
+        }
+        mContours = largestContours;
+    }
+
+    private void getCoordinates(IplImage img) {
+        CvMoments moments = new CvMoments();
+        cvMoments(img, moments, 1);
+        double mom10 = cvGetSpatialMoment(moments, 1, 0);
+        double mom01 = cvGetSpatialMoment(moments, 0, 1);
+        double area = cvGetCentralMoment(moments, 0, 0);
+        int posX = (int) (mom10 / area);
+        int posY = (int) (mom01 / area);
+    }
+
     public CvSeq getLargestContour() { return largestContour; }
 
     public int getYCentroid() { return centroidY; }
+
+    public MatVector getContours() {
+        return mContours;
+    }
 
 }
 
