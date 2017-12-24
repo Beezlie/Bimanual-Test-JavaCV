@@ -37,9 +37,6 @@
             android:name=".CalibrateActivity"
             android:screenOrientation="landscape" />
         <activity
-            android:name=".ProcessActivity"
-            android:screenOrientation="landscape" />
-        <activity
             android:name=".AnVideoView"
             android:screenOrientation="landscape" />
         <activity

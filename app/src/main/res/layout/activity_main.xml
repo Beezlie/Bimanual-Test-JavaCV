@@ -30,13 +30,6 @@
         android:text="Calibrate" />
 
     <Button
-        android:id="@+id/btnProcess"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Real-Time Processing" />
-
-    <Button
         android:id="@+id/btnVideoView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -48,6 +41,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Real Time" />
+        android:text="Real-Time Processing" />
 
 </LinearLayout>

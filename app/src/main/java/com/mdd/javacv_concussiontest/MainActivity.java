@@ -40,14 +40,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        findViewById(R.id.btnProcess).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (mPermissionReady) {
-                    startActivity(new Intent(MainActivity.this, ProcessActivity.class));
-                }
-            }
-        });
         findViewById(R.id.btnVideoView).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

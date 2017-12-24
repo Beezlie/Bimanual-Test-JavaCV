@@ -9,6 +9,7 @@ import android.util.Log;
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
 import org.bytedeco.javacpp.opencv_core;
+import org.bytedeco.javacpp.opencv_imgproc;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
@@ -26,6 +27,10 @@ import static java.lang.Math.abs;
 import static org.bytedeco.javacpp.opencv_core.CvRect;
 import static org.bytedeco.javacpp.opencv_core.CvSeq;
 import static org.bytedeco.javacpp.opencv_core.IplImage;
+import static org.bytedeco.javacpp.opencv_core.MatVector;
+import static org.bytedeco.javacpp.opencv_core.Mat;
+import static org.bytedeco.javacpp.opencv_core.Rect;
+import static org.bytedeco.javacpp.opencv_core.RotatedRect;
 import static org.bytedeco.javacpp.opencv_core.Scalar;
 import static org.bytedeco.javacpp.opencv_imgproc.*;
 
@@ -39,7 +44,6 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private OpenCVFrameConverter.ToIplImage toIplConverter;
     private OpenCVFrameConverter.ToMat toMatConverter;
     private Frame frame;
-    private Scalar CONTOUR_COLOR_WHITE = new Scalar(255,255,255,255);
     private int[] numCycles = new int[2];
     private int[] dirChange = new int[2];
     private int[] minPeak = {10000, 10000};
@@ -56,8 +60,10 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private List<Integer> amplitudesR = new ArrayList<>();
     private List<ColorBlobDetector> mDetectorList = new ArrayList<>();
     private File root;
-    private File datafile;
-    private FileWriter writer;
+    private File amplitudeData;
+    private File boundingData;
+    private FileWriter amplitudeWriter;
+    private FileWriter boundingWriter;
 
     public VideoProcessor(Activity activity, String filename, double pxscale, List<ColorBlobDetector> mDetectorList) {
         this.activity = activity;
@@ -79,9 +85,16 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
         toMatConverter = new OpenCVFrameConverter.ToMat();
 
         root = new File(Environment.getExternalStorageDirectory().toString());
-        datafile = new File(root, "data.txt");
+        amplitudeData = new File(root, "amplitudes.txt");
         try {
-            writer = new FileWriter(datafile);
+            amplitudeWriter = new FileWriter(amplitudeData);
+        } catch (IOException e) {
+            exception = e;
+        }
+
+        boundingData = new File(root, "boundingbox.txt");
+        try {
+            boundingWriter = new FileWriter(boundingData);
         } catch (IOException e) {
             exception = e;
         }
@@ -110,40 +123,32 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                 }
 
                 // process the frame
-                IplImage img = toIplConverter.convert(frame);
-                opencv_core.Mat mat = toMatConverter.convertToMat(frame);
-                CvSeq contours[] = new CvSeq[2];
+                //IplImage img = toIplConverter.convert(frame);
+                //CvSeq contours[] = new CvSeq[2];
+                Mat mat = toMatConverter.convertToMat(frame);
+                MatVector mContours[] = new MatVector[2];
 
                 for (int k = 0; k < 2; k++) {
-                    try {
-                        mDetectorList.get(k).processMat(mat);
-                        mDetectorList.get(k).process(img);
-                    } catch (InterruptedException e) {
-                        exception = e;
-                    }
+                    mDetectorList.get(k).threshold(mat);
+                    Mat threshed = mDetectorList.get(k).getThreshold();
 
-                    contours[k] = mDetectorList.get(k).getLargestContour();
+                    MatVector contours = new MatVector();
+                    findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
-                    //TODO - make sure the .total() is doing what I think its doing (getting total # elements)
-                    int s = contours[k].elem_size();
-                    Log.d(TAG, "Contours count: " + contours[k].total());
-                    if (contours[k].total() <= 0) {
+                    if (contours.size() <= 0) {
                         break;
                     }
+                    mContours[k] = contours;
 
-                    centroidPoints[k] = mDetectorList.get(k).getYCentroid();
+                    RotatedRect rect = minAreaRect(contours.get(0));
 
-                    //get bounding rectangle
-                    /*
-                    RotatedRect rect = minAreaRect(contours[k].get(0));
                     double boundWidth = rect.size().width();
                     double boundHeight = rect.size().height();
                     int boundPos = 0;
 
-
                     //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
-                    for (int i = 1; i < contours[k].total(); i++) {
-                        rect = minAreaRect(contours[k].get(i));
+                    for (int i = 1; i < contours.size(); i++) {
+                        rect = minAreaRect(contours.get(i));
                         if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
                             boundWidth = rect.size().width();
                             boundHeight = rect.size().height();
@@ -153,25 +158,33 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                     }
 
                     //create a new bounding rectangle from the largest contour area
-                    Rect boundRect = boundingRect(contours[k].get(boundPos));
-                    rectangle(mRgba, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
-                    */
-                    CvRect boundRect = cvBoundingRect(contours[k]);
+                    Rect boundRect = boundingRect(contours.get(boundPos));
+                    String box = "Bounding box " + k + ": width = " + boundRect.width() + ", height = " + boundRect.height() +
+                            ", bottom right = " + boundRect.br() + ", top left = " + boundRect.tl();
                     try {
-                        String result = "Bounding box " + k + ": x - " + boundRect.x() + ", y - " +
-                                boundRect.y() + ", width - " + boundRect.width() + ", height - " + boundRect.height();
-                        Log.i(TAG, result);
-                        writer.append(result);
+                        boundingWriter.append(box);
                     } catch (IOException e) {
                         exception = e;
                     }
 
+                    CvMoments moments = new CvMoments();
+                    cvMoments(new IplImage(contours.get(boundPos)), moments, 1);
+                    double m00 = cvGetSpatialMoment(moments, 0, 0);
+                    double m10 = cvGetSpatialMoment(moments, 1, 0);
+                    double m01 = cvGetSpatialMoment(moments, 0, 1);
+                    int centroidX = 0;
+                    int centroidY = 0;
+                    if (m00 != 0) {   // calculate center
+                        centroidX = (int) Math.round(m10 / m00);
+                        centroidY = (int) Math.round(m01 / m00);
+                    }
+                    centroidPoints[k] = centroidY;
                 }
 
-                if (contours[0].total() > 0 && contours[1].total() > 0) {
+                if (mContours[0].size() > 0 && mContours[1].size() > 0) {
                     movingWindow.addFirst(centroidPoints);
                     if (movingWindow.size() > 5) {
-                        movingWindow.removeLast();     //limit size of deque to 30
+                        movingWindow.removeLast();     //limit size of deque to 5
                     }
 
                     //track y-direction movement of centre of object
@@ -218,31 +231,6 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                             }
                         }
                     }
-
-                    Log.i(TAG, "numCycles left: " + numCycles[0]);
-                    Log.i(TAG, "numCycles right: " + numCycles[1]);
-                    //display results once 10 cycles completed
-                    if (numCycles[0] >= 10 && numCycles[1] >= 10 && !finishedTest) {
-                        for (int amp : amplitudesR) {
-                            String result = "Right hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0];
-                            Log.i(TAG, result);
-                            try {
-                                writer.append(result);
-                            } catch (IOException e) {
-                                exception = e;
-                            }
-                        }
-                        for (int amp : amplitudesL) {
-                            String result = "Left hand amplitude: " + (amp / pxscale) + " mm" + " at cycle count " + numCycles[0];
-                            Log.i(TAG, result);
-                            try {
-                                writer.append(result);
-                            } catch (IOException e) {
-                                exception = e;
-                            }
-                        }
-                        finishedTest = true;
-                    }
                 }
 
                 // Delay
@@ -263,10 +251,33 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
             exception = e;
         }
 
+        //display results once test completed
+        for (int amp : amplitudesR) {
+            String result = "Right hand amplitude: " + (amp / pxscale) + " mm";
+            Log.i(TAG, result);
+            try {
+                amplitudeWriter.append(result);
+            } catch (IOException e) {
+                exception = e;
+            }
+        }
+        for (int amp : amplitudesL) {
+            String result = "Left hand amplitude: " + (amp / pxscale) + " mm";
+            Log.i(TAG, result);
+            try {
+                amplitudeWriter.append(result);
+            } catch (IOException e) {
+                exception = e;
+            }
+        }
+
         try {
-            writer.append("Test Completed");
-            writer.flush();
-            writer.close();
+            boundingWriter.append("Test Completed");
+            boundingWriter.flush();
+            boundingWriter.close();
+            amplitudeWriter.append("Test Completed");
+            amplitudeWriter.flush();
+            amplitudeWriter.close();
         } catch (IOException e) {
             exception = e;
         }
