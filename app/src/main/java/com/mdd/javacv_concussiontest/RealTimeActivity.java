@@ -52,11 +52,14 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
     private FileWriter amplitudeWriter;
     private FileWriter boundingWriter;
     private Exception exception;
-    private ColorBlobDetector mDetector = new ColorBlobDetector();
+    private ColorBlobDetector mDetectorL = new ColorBlobDetector();
+    private ColorBlobDetector mDetectorR = new ColorBlobDetector();
+    private List<ColorBlobDetector> mDetectorList = new ArrayList<>();
     private int xTouch, yTouch;
     private int centroidX, centroidY;
     private boolean screenTouched = false;
-    private boolean mIsColorSelected = false;
+    private boolean[] mIsColorSelected = new boolean[2];
+    private int selector = 0;
     private opencv_core.Scalar mBlobColorHsv = new opencv_core.Scalar(255);
     private opencv_core.Scalar CONTOUR_COLOR_WHITE = new opencv_core.Scalar(255,255,255,255);
     private int numCycles;
@@ -102,7 +105,8 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-
+        mDetectorList.add(mDetectorL);
+        mDetectorList.add(mDetectorR);
     }
 
     @Override
@@ -129,62 +133,65 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
             mRgba.release();
         }
 
-        if (!mIsColorSelected)
-            return rgbaMat;
+        for (int k = 0; k < 2; k++) {
 
-        mDetector.threshold(rgbaMat);
+            if (!mIsColorSelected[k])
+                return rgbaMat;
 
-        Mat threshed = mDetector.getThreshold();
+            mDetectorList.get(k).threshold(rgbaMat);
 
-        MatVector contours = new MatVector(); // MatVector is a JavaCV list of Mats
-        findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+            Mat threshed = mDetectorList.get(k).getThreshold();
 
-        if (contours.size() <= 0) {
-            return rgbaMat;
-        }
+            MatVector contours = new MatVector(); // MatVector is a JavaCV list of Mats
+            findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
-        RotatedRect rect = minAreaRect(contours.get(0));
-
-        double boundWidth = rect.size().width();
-        double boundHeight = rect.size().height();
-        int boundPos = 0;
-
-        //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
-        for (int i = 1; i < contours.size(); i++) {
-            rect = minAreaRect(contours.get(i));
-            if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
-                boundWidth = rect.size().width();
-                boundHeight = rect.size().height();
-                //store the location in the contour list of the maximum area bounding rectangle
-                boundPos = i;
+            if (contours.size() <= 0) {
+                return rgbaMat;
             }
-        }
 
-        //create a new bounding rectangle from the largest contour area
-        Rect boundRect = boundingRect(contours.get(boundPos));
-        rectangle(rgbaMat, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
-        String box = "Bounding box: " + ": width = " + boundRect.width() + ", height = " + boundRect.height() +
-                ", bottom right = (" + boundRect.br().x() + "," +  boundRect.br().y() +
-                "), top left = (" + boundRect.tl().x() + "," +  boundRect.tl().y() + ")";
-        try {
-            boundingWriter.append(box);
-            boundingWriter.append("\n\r");
-        } catch (IOException e) {
-            exception = e;
-        }
+            RotatedRect rect = minAreaRect(contours.get(0));
 
-        opencv_imgproc.CvMoments moments = new opencv_imgproc.CvMoments();
-        cvMoments(new opencv_core.IplImage(contours.get(boundPos)), moments, 1);
-        double m00 = cvGetSpatialMoment(moments, 0, 0);
-        double m10 = cvGetSpatialMoment(moments, 1, 0);
-        double m01 = cvGetSpatialMoment(moments, 0, 1);
-        if (m00 != 0) {   // calculate center
-            centroidX = (int) Math.round(m10 / m00);
-            centroidY = (int) Math.round(m01 / m00);
-        }
-        circle(rgbaMat, new Point(centroidX, centroidY), 4, new Scalar(255,255,255,255));
+            double boundWidth = rect.size().width();
+            double boundHeight = rect.size().height();
+            int boundPos = 0;
 
-        trackMotion(contours, centroidY);
+            //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
+            for (int i = 1; i < contours.size(); i++) {
+                rect = minAreaRect(contours.get(i));
+                if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
+                    boundWidth = rect.size().width();
+                    boundHeight = rect.size().height();
+                    //store the location in the contour list of the maximum area bounding rectangle
+                    boundPos = i;
+                }
+            }
+
+            //create a new bounding rectangle from the largest contour area
+            Rect boundRect = boundingRect(contours.get(boundPos));
+            rectangle(rgbaMat, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
+            String box = "Bounding box " + k + ": width = " + boundRect.width() + ", height = " + boundRect.height() +
+                    ", bottom right = (" + boundRect.br().x() + "," + boundRect.br().y() +
+                    "), top left = (" + boundRect.tl().x() + "," + boundRect.tl().y() + ")";
+            try {
+                boundingWriter.append(box);
+                boundingWriter.append("\n\r");
+            } catch (IOException e) {
+                exception = e;
+            }
+
+            opencv_imgproc.CvMoments moments = new opencv_imgproc.CvMoments();
+            cvMoments(new opencv_core.IplImage(contours.get(boundPos)), moments, 1);
+            double m00 = cvGetSpatialMoment(moments, 0, 0);
+            double m10 = cvGetSpatialMoment(moments, 1, 0);
+            double m01 = cvGetSpatialMoment(moments, 0, 1);
+            if (m00 != 0) {   // calculate center
+                centroidX = (int) Math.round(m10 / m00);
+                centroidY = (int) Math.round(m01 / m00);
+            }
+            circle(rgbaMat, new Point(centroidX, centroidY), 4, new Scalar(255, 255, 255, 255));
+
+            trackMotion(contours, centroidY, k);
+        }
 
         return rgbaMat;
     }
@@ -237,14 +244,15 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
             mBlobColorHsv.put(i, mBlobColorHsv.get(i) / pointCount);
         }
 
-        mDetector.setHsvColor(mBlobColorHsv);
-        mIsColorSelected = true;
+        mDetectorList.get(selector).setHsvColor(mBlobColorHsv);
+        mIsColorSelected[selector] = true;
+        selector ^= 1;
 
         touchedRegionRgba.release();
         touchedRegionHsv.release();
     }
 
-    private void trackMotion(MatVector contours, int centroidY) {
+    private void trackMotion(MatVector contours, int centroidY, int objectNum) {
         if (contours.size() > 0) {
             movingWindow.addFirst(centroidY);
             if (movingWindow.size() > 5) {
@@ -290,7 +298,7 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
                     dirChange = 0;
                     numCycles++;
 
-                    String result = "Amplitude = " + amp + ", at cycle number " + numCycles;
+                    String result = "Object " + objectNum + "Amplitude = " + amp + ", at cycle number " + numCycles;
                     Log.i(TAG, result);
                     try {
                         amplitudeWriter.append(result);
