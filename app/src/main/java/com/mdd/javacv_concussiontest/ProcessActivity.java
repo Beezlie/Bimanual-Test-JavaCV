@@ -90,7 +90,7 @@ public class ProcessActivity extends Activity implements View.OnTouchListener, C
         }
 
         double j = grabber.getFrameRate();
-        delay = Math.round(100d / grabber.getFrameRate());
+        delay = Math.round(1000d / grabber.getFrameRate());
         //delay = Math.round(1000d / grabber.getFrameRate());
     }
 

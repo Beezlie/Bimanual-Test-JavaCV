@@ -42,7 +42,12 @@
         <activity
             android:name=".RealTimeActivity"
             android:screenOrientation="landscape" />
-        <activity android:name=".ProcessActivity"></activity>
+        <activity
+            android:name=".ProcessActivity"
+            android:screenOrientation="landscape"/>
+        <activity
+            android:name=".RecorderActivity"
+            android:screenOrientation="landscape" />
     </application>
 
 </manifest>
