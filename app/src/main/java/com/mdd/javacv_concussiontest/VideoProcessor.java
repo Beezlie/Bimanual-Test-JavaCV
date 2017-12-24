@@ -49,9 +49,6 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
     private int[] minPeak = {10000, 10000};
     private int[] maxPeak = {0, 0};
     private int[] centroidPoints = new int[2];
-    private int[] boundRectTL = new int[2];
-    private int[] boundRectBR = new int[2];
-    private boolean finishedTest = false;
     private String[] dirY = new String[2];
     private String[] dirYprev = new String[2];
     private boolean[] movingY = new boolean[2];
@@ -135,6 +132,12 @@ public class VideoProcessor extends AsyncTask<Void, Void, Void> {
                     MatVector contours = new MatVector();
                     findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
+                    //TODO
+                    //figure out why no contours are being detected
+                    //real time works with the same detection algorithm
+                    //and we can see the stored video in the playback
+                    //so why is this not working?
+                    //Is the problem occuring in reading the frames?
                     if (contours.size() <= 0) {
                         break;
                     }

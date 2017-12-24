@@ -58,13 +58,10 @@ import static org.bytedeco.javacpp.opencv_imgproc.findContours;
 
 public class ColorBlobDetector {
     String LOG_TAG = "ColorBlobDetection";
-    // Lower and Upper bounds for range checking in HSV color space
     private Scalar mLowerBound = new Scalar(0);
     private Scalar mUpperBound = new Scalar(0);
-    // Minimum contour area in percent for contours filtering
     private static double mMinContourArea = 0.1;
     private static final float SMALLEST_AREA = 600.0f;
-    // Color radius for range checking in HSV color space
     private Scalar mColorRadius = new Scalar(25,50,50,0);
     private List<Mat> mContours = new ArrayList<Mat>();
     private CvMemStorage mem = CvMemStorage.create();
@@ -82,23 +79,17 @@ public class ColorBlobDetector {
         double minH = (hsvColor.get(0) >= mColorRadius.get(0)) ? hsvColor.get(0)-mColorRadius.get(0) : 0;
         double maxH = (hsvColor.get(0)+mColorRadius.get(0) <= 255) ? hsvColor.get(0)+mColorRadius.get(0) : 255;
 
-        mLowerBound.put(0, minH);
-        mUpperBound.put(0, maxH);
         hueLower = (int)minH;
         hueUpper = (int)maxH;
-
-        mLowerBound.put(1, hsvColor.get(1) - mColorRadius.get(1));
-        mUpperBound.put(1, hsvColor.get(1) + mColorRadius.get(1));
         satLower = (int)(hsvColor.get(1) - mColorRadius.get(1));
         satUpper = (int)(hsvColor.get(1) + mColorRadius.get(1));
-
-        mLowerBound.put(2, hsvColor.get(2) - mColorRadius.get(2));
-        mUpperBound.put(2, hsvColor.get(2) + mColorRadius.get(2));
         briLower = (int)(hsvColor.get(2) - mColorRadius.get(2));
         briUpper = (int)(hsvColor.get(2) + mColorRadius.get(2));
 
-        mLowerBound.put(3, 0);
-        mUpperBound.put(3, 255);
+        Scalar lowerBound = new Scalar(hueLower, satLower, briLower, 0);
+        Scalar upperBound = new Scalar(hueUpper, satUpper, briUpper, 0);
+        mLowerBound = lowerBound;
+        mUpperBound = upperBound;
     }
 
     public void process(IplImage img) throws FrameGrabber.Exception, InterruptedException {
@@ -323,6 +314,10 @@ public class ColorBlobDetector {
     }
 
     public Mat getThreshold() { return threshed; }
+
+    public Scalar getLowerBound() { return mLowerBound; }
+
+    public Scalar getUpperBound() { return mUpperBound; }
 
 }
 

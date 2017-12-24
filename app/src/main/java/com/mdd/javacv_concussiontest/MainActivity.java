@@ -56,6 +56,14 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        findViewById(R.id.btnProcess).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (mPermissionReady) {
+                    startActivity(new Intent(MainActivity.this, ProcessActivity.class));
+                }
+            }
+        });
 
         int cameraPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
         int storagePermssion = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
