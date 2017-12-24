@@ -289,9 +289,6 @@ public class ColorBlobDetector {
 
         cvtColor(mat, hsv, COLOR_RGB2HSV_FULL);
 
-        //E/cv::error(): OpenCV Error: Sizes of input arguments do not match
-        // (The lower bounary is neither an array of the same size and same type as src, nor a scalar)
-        // in void cv::inRange
         inRange(hsv, new Mat(1, 1, CV_32SC4, new Scalar(hueLower, satLower, briLower, 0)),
                 new Mat(1, 1, CV_32SC4, new Scalar(hueUpper, satUpper, briUpper, 0)), thresh);
 
@@ -318,6 +315,20 @@ public class ColorBlobDetector {
     public Scalar getLowerBound() { return mLowerBound; }
 
     public Scalar getUpperBound() { return mUpperBound; }
+
+    public void setLowerBound(Scalar lowerBound) {
+        mLowerBound = lowerBound;
+        hueLower = (int)lowerBound.get(0);
+        satLower = (int)lowerBound.get(1);
+        briLower = (int)lowerBound.get(2);
+    }
+
+    public void setUpperBound(Scalar upperBound) {
+        mUpperBound = upperBound;
+        hueUpper = (int)upperBound.get(0);
+        satUpper = (int)upperBound.get(1);
+        briUpper = (int)upperBound.get(2);
+    }
 
 }
 

@@ -106,10 +106,6 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
 
         setContentView(R.layout.activity_recorder);
 
-        cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
-        leftButton = (Button) findViewById(R.id.left_color);
-        rightButton = (Button) findViewById(R.id.right_color);
-
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, CLASS_LABEL);
         wakeLock.acquire();
@@ -176,6 +172,9 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
         btnRecorderControl = (Button) findViewById(R.id.recorder_control);
         btnRecorderControl.setText("Start");
         btnRecorderControl.setOnClickListener(this);
+        cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
+        leftButton = (Button) findViewById(R.id.left_color);
+        rightButton = (Button) findViewById(R.id.right_color);
 
         cameraView.setCvCameraViewListener(this);
         cameraView.setOnTouchListener(this);
@@ -302,6 +301,7 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
     public void onClick(View v) {
         if (mIsColorSelected[0] && mIsColorSelected[1]) {
             if (!recording) {
+                saveThreshColors();
                 startRecording();
                 recording = true;
                 Log.w(LOG_TAG, "Start Button Pushed");
@@ -370,41 +370,6 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
         screenTouched = true;
 
         return false; // don't need subsequent touch events
-    }
-
-    public int pxToDistance() {
-        //f_x = f * m_x
-        //f_y = f * m_y
-        //solve for mx and my
-
-        //return focal_mm / sensor_width_mm;
-        return 1;
-    }
-
-    public void saveParams() {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        SharedPreferences.Editor editor = prefs.edit();
-
-        editor.putInt("pxscale", pxToDistance());
-
-        //TODO - figure out how to get threshold values to save to shared prefs
-        /*
-        String s;
-        Scalar bound;
-        bound = mDetectorL.getLowerBound();
-        double output[] = {bound.get(0), bound.get(1), bound.get(2), bound.get(3)};
-        s = Arrays.toString(output);
-        s = s.substring(1, s.length() - 1);
-        String[] s_array = s.split(", ");
-        editor.putStringSet("left_lower_bound", s_array);
-
-        editor.putString("right_lower_bound", json);
-
-        editor.putString("left_upper_bound", json);
-
-        editor.putString("right_upper_bound", json);
-        */
-        editor.commit();
     }
 
     public void getPixelColor(Mat mTouched, int xTouch, int yTouch) {
@@ -478,6 +443,31 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
         src.release();
         touchedRegionRgba.release();
         touchedRegionHsv.release();
+    }
+
+    public void saveThreshColors() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        Scalar leftLowerBound = mDetectorList.get(0).getLowerBound();
+        Scalar rightLowerBound = mDetectorList.get(1).getLowerBound();
+        editor.putInt(getString(R.string.leftHueLower), (int)leftLowerBound.get(0));
+        editor.putInt(getString(R.string.leftSatLower), (int)leftLowerBound.get(1));
+        editor.putInt(getString(R.string.leftBriLower), (int)leftLowerBound.get(2));
+        editor.putInt(getString(R.string.rightHueLower), (int)rightLowerBound.get(0));
+        editor.putInt(getString(R.string.rightSatLower), (int)rightLowerBound.get(1));
+        editor.putInt(getString(R.string.rightBriLower), (int)rightLowerBound.get(2));
+
+        Scalar leftUpperBound = mDetectorList.get(0).getUpperBound();
+        Scalar rightUpperBound = mDetectorList.get(1).getUpperBound();
+        editor.putInt(getString(R.string.leftHueUpper), (int)leftUpperBound.get(0));
+        editor.putInt(getString(R.string.leftSatUpper), (int)leftUpperBound.get(1));
+        editor.putInt(getString(R.string.leftBriUpper), (int)leftUpperBound.get(2));
+        editor.putInt(getString(R.string.rightHueUpper), (int)rightUpperBound.get(0));
+        editor.putInt(getString(R.string.rightSatUpper), (int)rightUpperBound.get(1));
+        editor.putInt(getString(R.string.rightBriUpper), (int)rightUpperBound.get(2));
+
+        editor.commit();
     }
 
     public void updateLeftButton() {

@@ -1,8 +1,10 @@
 package com.mdd.javacv_concussiontest;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Environment;
+import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -38,20 +40,15 @@ import static org.bytedeco.javacpp.opencv_imgproc.findContours;
 import static org.bytedeco.javacpp.opencv_imgproc.minAreaRect;
 import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 
-public class ProcessActivity extends Activity implements View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
+public class ProcessActivity extends Activity implements CvCameraPreview.CvCameraViewListener {
     final String TAG = "ProcessActivity";
 
     private CvCameraPreview cameraView;
     private ColorBlobDetector mDetector = new ColorBlobDetector();
-    private int xTouch, yTouch;
     private int centroidX, centroidY;
-    private boolean screenTouched = false;
-    private boolean mIsColorSelected = false;
-    private opencv_core.Scalar mBlobColorHsv = new opencv_core.Scalar(255);
     private opencv_core.Scalar CONTOUR_COLOR_WHITE = new opencv_core.Scalar(255,255,255,255);
     private FFmpegFrameGrabber grabber;
     private Exception exception;
-    private OpenCVFrameConverter.ToIplImage toIplConverter;
     private OpenCVFrameConverter.ToMat toMatConverter;
     private Frame frame;
     private long delay;
@@ -67,13 +64,9 @@ public class ProcessActivity extends Activity implements View.OnTouchListener, C
         cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
         cameraView.setCvCameraViewListener(this);
 
-        initLayout();
+        retrieveThreshColors();
     }
 
-    private void initLayout() {
-        cameraView.setCvCameraViewListener(this);
-        cameraView.setOnTouchListener(this);
-    }
 
     @Override
     public void onCameraViewStarted(int width, int height) {
@@ -89,7 +82,6 @@ public class ProcessActivity extends Activity implements View.OnTouchListener, C
             exception = e;
         }
 
-        double j = grabber.getFrameRate();
         delay = Math.round(1000d / grabber.getFrameRate());
         //delay = Math.round(1000d / grabber.getFrameRate());
     }
@@ -117,14 +109,6 @@ public class ProcessActivity extends Activity implements View.OnTouchListener, C
 
                 // process the frame
                 fMat = toMatConverter.convertToMat(frame);
-                if (screenTouched) {
-                    screenTouched = false;
-                    getPixelColor(fMat, xTouch, yTouch);
-                }
-
-                if (!mIsColorSelected)
-                    return fMat;
-
                 mDetector.threshold(fMat);
                 Mat threshed = mDetector.getThreshold();
 
@@ -167,7 +151,6 @@ public class ProcessActivity extends Activity implements View.OnTouchListener, C
                 }
                 circle(fMat, new opencv_core.Point(centroidX, centroidY), 4, new opencv_core.Scalar(255,255,255,255));
 
-
                 // Delay
                 try {
                     Thread.sleep(delay);
@@ -183,59 +166,21 @@ public class ProcessActivity extends Activity implements View.OnTouchListener, C
         return fMat;
     }
 
-    public boolean onTouch(View v, MotionEvent event) {
-        xTouch = (int)event.getX();
-        yTouch = (int)event.getY();
-        screenTouched = true;
+    public void retrieveThreshColors() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-        return false; // don't need subsequent touch events
-    }
+        double hueLower = (double)prefs.getInt(getString(R.string.rightHueLower), 0);
+        double satLower = (double)prefs.getInt(getString(R.string.rightSatLower), 0);
+        double briLower = (double)prefs.getInt(getString(R.string.rightBriLower), 0);
+        double hueUpper = (double)prefs.getInt(getString(R.string.rightHueUpper), 0);
+        double satUpper = (double)prefs.getInt(getString(R.string.rightSatUpper), 0);
+        double briUpper = (double)prefs.getInt(getString(R.string.rightBriUpper), 0);
 
-    public void getPixelColor(Mat mTouched, int xTouch, int yTouch) {
-        int cols = mTouched.cols();
-        int rows = mTouched.rows();
+        opencv_core.Scalar lowerBound = new opencv_core.Scalar(hueLower, satLower, briLower, 0);
+        opencv_core.Scalar upperBound = new opencv_core.Scalar(hueUpper, satUpper, briUpper, 0);
 
-        int xOffset = (cameraView.getPreviewWidth() - cols) / 2;
-        int yOffset = (cameraView.getPreviewHeight() - rows) / 2;
-
-        //TODO fix incorrect calculation of x and y - need to scale xTouch and yTouch so x and y are within the matrix dimens
-        int x = xTouch - xOffset;
-        int y = yTouch - yOffset;
-
-        Log.i(TAG, "Touched image coordinates: (" + x + ", " + y + ")");
-
-        if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) {
-            screenTouched = false;
-            return;
-        }
-
-        Rect touchedRect = new Rect();
-
-        int tmpx = (x>5) ? x-5 : 0;
-        int tmpy = (y>5) ? y-5 : 0;
-        touchedRect.x(tmpx);// = (x>5) ? x-5 : 0;
-        touchedRect.y(tmpy);// = (y>5) ? y-5 : 0;
-
-        int tmpw = (x+5 < cols) ? x + 5 - touchedRect.x() : cols - touchedRect.x();
-        int tmph = (y+5 < rows) ? y + 5 - touchedRect.y() : rows - touchedRect.y();
-        touchedRect.width(tmpw);
-        touchedRect.height(tmph);
-
-        // Calculate average hsv color of touched region
-        Mat touchedRegionRgba = new Mat(mTouched, touchedRect);
-        Mat touchedRegionHsv = new Mat();
-        cvtColor(touchedRegionRgba, touchedRegionHsv, COLOR_RGB2HSV_FULL);
-        mBlobColorHsv = sumElems(touchedRegionHsv);
-        int pointCount = touchedRect.width()*touchedRect.height();
-        for (int i = 0; i < 3; i++) {
-            mBlobColorHsv.put(i, mBlobColorHsv.get(i) / pointCount);
-        }
-
-        mDetector.setHsvColor(mBlobColorHsv);
-        mIsColorSelected = true;
-
-        touchedRegionRgba.release();
-        touchedRegionHsv.release();
+        mDetector.setLowerBound(lowerBound);
+        mDetector.setUpperBound(upperBound);
     }
 
 }
