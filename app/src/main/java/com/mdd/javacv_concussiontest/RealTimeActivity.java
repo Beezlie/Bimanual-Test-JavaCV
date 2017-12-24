@@ -10,27 +10,22 @@ import android.view.View;
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
 import org.bytedeco.javacpp.opencv_core;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.bytedeco.javacpp.opencv_imgproc;
 
 import static org.bytedeco.javacpp.opencv_core.CV_8UC4;
 import static org.bytedeco.javacpp.opencv_core.Mat;
 import static org.bytedeco.javacpp.opencv_core.sumElems;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
-import static org.bytedeco.javacpp.opencv_imgproc.CV_BGR2GRAY;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_CHAIN_APPROX_SIMPLE;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_RETR_TREE;
 import static org.bytedeco.javacpp.opencv_imgproc.boundingRect;
-import static org.bytedeco.javacpp.opencv_imgproc.contourArea;
+import static org.bytedeco.javacpp.opencv_imgproc.circle;
+import static org.bytedeco.javacpp.opencv_imgproc.cvGetSpatialMoment;
+import static org.bytedeco.javacpp.opencv_imgproc.cvMoments;
 import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.findContours;
 import static org.bytedeco.javacpp.opencv_imgproc.minAreaRect;
 import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
-
-/**
- * Created by hunghd on 4/10/17.
- */
 
 public class RealTimeActivity extends Activity implements View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
     final String TAG = "OpenCvActivity";
@@ -38,6 +33,7 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
     private CvCameraPreview cameraView;
     private ColorBlobDetector mDetector = new ColorBlobDetector();
     private int xTouch, yTouch;
+    private int centroidX, centroidY;
     private boolean screenTouched = false;
     private boolean mIsColorSelected = false;
     private opencv_core.Scalar mBlobColorHsv = new opencv_core.Scalar(255);
@@ -113,12 +109,19 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
 
         //create a new bounding rectangle from the largest contour area
         opencv_core.Rect boundRect = boundingRect(contours.get(boundPos));
-
-        //rectangle(Mat img, Point pt1, Point pt2, Scalar color, int thickness, int lineType, int shift)
-        //draws a bounding rectangle on the image (tl = top-left, br = bottom-right)
         rectangle(rgbaMat, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
 
-        //return threshed;
+        opencv_imgproc.CvMoments moments = new opencv_imgproc.CvMoments();
+        cvMoments(new opencv_core.IplImage(contours.get(boundPos)), moments, 1);
+        double m00 = cvGetSpatialMoment(moments, 0, 0);
+        double m10 = cvGetSpatialMoment(moments, 1, 0);
+        double m01 = cvGetSpatialMoment(moments, 0, 1);
+        if (m00 != 0) {   // calculate center
+            centroidX = (int) Math.round(m10 / m00);
+            centroidY = (int) Math.round(m01 / m00);
+        }
+        circle(rgbaMat, new opencv_core.Point(centroidX, centroidY), 4, new opencv_core.Scalar(255,255,255,255));
+
         return rgbaMat;
     }
 
@@ -176,6 +179,5 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
 
         touchedRegionRgba.release();
         touchedRegionHsv.release();
-
     }
 }
