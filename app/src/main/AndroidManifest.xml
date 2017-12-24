@@ -42,6 +42,9 @@
         <activity
             android:name=".AnVideoView"
             android:screenOrientation="landscape" />
+        <activity
+            android:name=".RealTimeActivity"
+            android:screenOrientation="landscape" />
     </application>
 
 </manifest>

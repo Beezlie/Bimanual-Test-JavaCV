@@ -34,7 +34,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Process" />
+        android:text="Real-Time Processing" />
 
     <Button
         android:id="@+id/btnVideoView"
@@ -42,5 +42,12 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="View Stored Video" />
+
+    <Button
+        android:id="@+id/btnRealTime"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Real Time" />
 
 </LinearLayout>

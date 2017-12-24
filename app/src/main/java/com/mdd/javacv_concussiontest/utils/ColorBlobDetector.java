@@ -14,6 +14,9 @@ import org.bytedeco.javacpp.opencv_core.Mat;
 import org.bytedeco.javacpp.opencv_core.MatVector;
 import org.bytedeco.javacv.FrameGrabber;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.bytedeco.javacpp.opencv_core.CV_32SC4;
 import static org.bytedeco.javacpp.opencv_core.cvCloneImage;
 import static org.bytedeco.javacpp.opencv_core.cvCreateImage;
@@ -31,6 +34,7 @@ import static org.bytedeco.javacpp.opencv_imgproc.CV_GAUSSIAN;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_MEDIAN;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_RETR_CCOMP;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_RETR_LIST;
+import static org.bytedeco.javacpp.opencv_imgproc.CV_RETR_TREE;
 import static org.bytedeco.javacpp.opencv_imgproc.CvMoments;
 import static org.bytedeco.javacpp.opencv_imgproc.GaussianBlur;
 import static org.bytedeco.javacpp.opencv_imgproc.RETR_EXTERNAL;
@@ -62,13 +66,15 @@ public class ColorBlobDetector {
     private static final float SMALLEST_AREA = 600.0f;
     // Color radius for range checking in HSV color space
     private Scalar mColorRadius = new Scalar(25,50,50,0);
-    private MatVector mContours = new MatVector();
+    private List<Mat> mContours = new ArrayList<Mat>();
     private CvMemStorage mem = CvMemStorage.create();
     private static final double IMG_SCALE = 2;
     private int hueLower, hueUpper, satLower, satUpper, briLower, briUpper;
     private CvSeq largestContour = new CvSeq();
     private int centroidY;
     private int centroidX;
+    private Mat threshed;
+    private MatVector contourResult;
 
     //TODO try to use the hue/sat/bri instead of the scalars i was using before
     //Also try to use something other than MAt for spectrum hsv
@@ -173,6 +179,8 @@ public class ColorBlobDetector {
         inRange(hsv, new Mat(1, 1, CV_32SC4, new Scalar(hueLower, satLower, briLower, 0)),
                 new Mat(1, 1, CV_32SC4, new Scalar(hueUpper, satUpper, briUpper, 0)), thresh);
 
+        threshed = thresh;
+
         //Mat dilated = new Mat();
         //dilate(thresh, dilated, new Mat());
 
@@ -198,7 +206,53 @@ public class ColorBlobDetector {
                 largestContours.put(contour);
             }
         }
+        //mContours = largestContours;
+    }
+
+    public void processMat2(Mat mat) {
+        Mat hsv = new Mat();
+        Mat thresh = new Mat();
+
+        GaussianBlur(mat, mat, new opencv_core.Size(3,3), 1);
+
+        cvtColor(mat, hsv, COLOR_RGB2HSV_FULL);
+
+        //E/cv::error(): OpenCV Error: Sizes of input arguments do not match
+        // (The lower bounary is neither an array of the same size and same type as src, nor a scalar)
+        // in void cv::inRange
+        inRange(hsv, new Mat(1, 1, CV_32SC4, new Scalar(hueLower, satLower, briLower, 0)),
+                new Mat(1, 1, CV_32SC4, new Scalar(hueUpper, satUpper, briUpper, 0)), thresh);
+
+        //Mat dilated = new Mat();
+        //dilate(thresh, dilated, new Mat());
+
+        MatVector contours = new MatVector();
+        findContours(thresh, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+        // Find max contour area
+        double maxArea = 0;
+        //iterate over list of contour vectors
+        for (int i = 0; i < contours.size(); i++) {
+            //contour - Input vector of 2D points (contour vertices)
+            double area = contourArea(contours.get(i));
+            if (area > maxArea)
+                maxArea = area;
+        }
+
+        // Filter contours by area and resize to fit the original image size
+        List<Mat> largestContours = new ArrayList<Mat>();
+        long n = contours.size();
+        for (int i = 0; i < contours.size(); i++) {
+            Mat contour = contours.get(i);
+            if (contourArea(contour) > mMinContourArea*maxArea) {
+                largestContours.add(contour);
+            }
+        }
+        //TODO - FIX error with the way I am putting the contours into largestContours
+        //the issue is that the size becomes massive which is wrong
+        n = largestContours.size();
         mContours = largestContours;
+        Mat test = largestContours.get(0);
     }
 
     private void getCoordinates(IplImage img) {
@@ -211,13 +265,64 @@ public class ColorBlobDetector {
         int posY = (int) (mom01 / area);
     }
 
+    public void process3(IplImage img) {
+        IplImage imgHsv = cvCreateImage(cvSize(img.width(), img.height()), img.depth(), 3);
+        cvCvtColor(img, imgHsv, CV_BGR2HSV);
+
+        IplImage imgThreshold = cvCreateImage(cvGetSize(imgHsv), 8, 1);
+        CvScalar hsv_min = cvScalar(hueLower, satLower, briLower, 0);
+        CvScalar hsv_max = cvScalar(hueUpper, satUpper, briUpper, 0);
+        cvInRangeS(imgHsv, hsv_min, hsv_max, imgThreshold);
+
+        cvSmooth(imgThreshold, imgThreshold, CV_GAUSSIAN, 3,3,1,1);
+        //IplImage imgDilated = cvCreateImage(cvGetSize(imgThreshold), 8, 1);
+        //cvDilate(imgThreshold, imgDilated);
+
+        //test code
+        getCoordinates(imgThreshold);
+
+        CvSeq bigContour = findBiggestContour(imgThreshold);
+        if (bigContour == null) {
+            return;
+        }
+
+        extractCentroid(bigContour);
+        largestContour = bigContour;
+    }
+
+    public void threshold(Mat mat) {
+        Mat hsv = new Mat();
+        Mat thresh = new Mat();
+
+        GaussianBlur(mat, mat, new opencv_core.Size(3, 3), 1);
+
+        cvtColor(mat, hsv, COLOR_RGB2HSV_FULL);
+
+        //E/cv::error(): OpenCV Error: Sizes of input arguments do not match
+        // (The lower bounary is neither an array of the same size and same type as src, nor a scalar)
+        // in void cv::inRange
+        inRange(hsv, new Mat(1, 1, CV_32SC4, new Scalar(hueLower, satLower, briLower, 0)),
+                new Mat(1, 1, CV_32SC4, new Scalar(hueUpper, satUpper, briUpper, 0)), thresh);
+
+        threshed = thresh;
+    }
+
+    public void contourDetection(Mat mat) {
+        MatVector result = new MatVector(); // MatVector is a JavaCV list of Mats
+        findContours(mat, result, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+
+        contourResult = result;
+    }
+
     public CvSeq getLargestContour() { return largestContour; }
 
     public int getYCentroid() { return centroidY; }
 
-    public MatVector getContours() {
+    public List<Mat> getContours() {
         return mContours;
     }
+
+    public Mat getThreshold() { return threshed; }
 
 }
 
