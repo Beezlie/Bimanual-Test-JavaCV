@@ -46,16 +46,6 @@ import static org.bytedeco.javacpp.opencv_core.sumElems;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
 import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
 
-/*
-TODO FOR PROJECT
-1) fix the fact that touch doesn't work for the whole screen (there is a mismatch between matrix size and screen size) - may need to live with this though
-2) debug the actual processing
-3) implement the pixel scaling using some type of calibration
-4) store pixel scaling in shared preferences
-5) simplify app by keeping only RecordActivity and the calibration activity
-6) fix view.WindowLeaked error
- */
-
 public class RecorderActivity extends Activity implements OnClickListener, View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
 
     private final static String CLASS_LABEL = "RecorderActivity";

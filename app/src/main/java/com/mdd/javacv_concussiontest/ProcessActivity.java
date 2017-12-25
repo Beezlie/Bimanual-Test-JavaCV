@@ -7,8 +7,6 @@ import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.util.Log;
-import android.view.MotionEvent;
-import android.view.View;
 
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
@@ -20,22 +18,14 @@ import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
 import java.io.File;
-import java.io.IOException;
 
-import static android.content.ContentValues.TAG;
-import static java.lang.Math.abs;
-import static org.bytedeco.javacpp.opencv_core.CV_8UC4;
 import static org.bytedeco.javacpp.opencv_core.Mat;
-import static org.bytedeco.javacpp.opencv_core.Rect;
-import static org.bytedeco.javacpp.opencv_core.sumElems;
-import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_CHAIN_APPROX_SIMPLE;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_RETR_TREE;
 import static org.bytedeco.javacpp.opencv_imgproc.boundingRect;
 import static org.bytedeco.javacpp.opencv_imgproc.circle;
 import static org.bytedeco.javacpp.opencv_imgproc.cvGetSpatialMoment;
 import static org.bytedeco.javacpp.opencv_imgproc.cvMoments;
-import static org.bytedeco.javacpp.opencv_imgproc.cvtColor;
 import static org.bytedeco.javacpp.opencv_imgproc.findContours;
 import static org.bytedeco.javacpp.opencv_imgproc.minAreaRect;
 import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
@@ -115,6 +105,9 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
                 opencv_core.MatVector contours = new opencv_core.MatVector();
                 findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
+                //TODO - figure out why no contours detected
+                //could it be an issue with the color?
+                //because some times there is a bounding box but it will be in a random location for a random color
                 if (contours.size() <= 0) {
                     return fMat;
                 }

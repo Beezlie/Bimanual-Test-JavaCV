@@ -43,7 +43,7 @@ import static org.bytedeco.javacpp.opencv_imgproc.minAreaRect;
 import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 
 public class RealTimeActivity extends Activity implements View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
-    final String TAG = "OpenCvActivity";
+    final String TAG = "RealTimeActivity";
 
     private CvCameraPreview cameraView;
     private File root;
@@ -82,13 +82,13 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
         cameraView.setCvCameraViewListener(this);
 
         root = new File(Environment.getExternalStorageDirectory().toString());
-        amplitudeData = new File(root, "amplitudes.txt");
+        amplitudeData = new File(root, "real_time_amplitudes.txt");
         try {
             amplitudeWriter = new FileWriter(amplitudeData);
         } catch (IOException e) {
             exception = e;
         }
-        boundingData = new File(root, "boundingbox.txt");
+        boundingData = new File(root, "real_time_boundingbox.txt");
         try {
             boundingWriter = new FileWriter(boundingData);
         } catch (IOException e) {
