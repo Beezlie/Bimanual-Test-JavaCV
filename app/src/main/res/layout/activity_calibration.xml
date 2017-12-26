@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/caibration_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <com.mdd.javacv_concussiontest.CvCameraPreview
+        android:id="@+id/camera_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:camera_type="back"
+        app:scale_type="full" />
+
+    <EditText
+        android:id="@+id/distance"
+        android:hint="@string/distance"
+        android:inputType="number"
+        android:textColor="#FF0000"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true">
+    </EditText>
+
+    <Button
+        android:id="@+id/calibrate"
+        android:layout_width="fill_parent"
+        android:layout_height="80dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentBottom="true"
+        android:onClick="calibrate"
+        android:text="@string/calibrate">
+    </Button>
+
+</RelativeLayout>

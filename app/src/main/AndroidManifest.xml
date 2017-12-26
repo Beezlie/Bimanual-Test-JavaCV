@@ -44,10 +44,11 @@
             android:screenOrientation="landscape" />
         <activity
             android:name=".ProcessActivity"
-            android:screenOrientation="landscape"/>
+            android:screenOrientation="landscape" />
         <activity
             android:name=".RecorderActivity"
             android:screenOrientation="landscape" />
+        <activity android:name=".CalibrationActivity"></activity>
     </application>
 
 </manifest>

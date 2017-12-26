@@ -43,7 +43,6 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
     private Frame frame;
     private long delay;
     private int frameCounter = 0;
-    private Mat fMat;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -73,7 +72,6 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
         }
 
         delay = Math.round(1000d / grabber.getFrameRate());
-        //delay = Math.round(1000d / grabber.getFrameRate());
     }
 
     @Override
@@ -98,9 +96,12 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
                 }
 
                 // process the frame
-                fMat = toMatConverter.convertToMat(frame);
+                Mat fMat = toMatConverter.convertToMat(frame);
                 mDetector.threshold(fMat);
                 Mat threshed = mDetector.getThreshold();
+
+                opencv_core.Scalar test1 = mDetector.getLowerBound();
+                opencv_core.Scalar test2 = mDetector.getUpperBound();
 
                 opencv_core.MatVector contours = new opencv_core.MatVector();
                 findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
@@ -144,6 +145,8 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
                 }
                 circle(fMat, new opencv_core.Point(centroidX, centroidY), 4, new opencv_core.Scalar(255,255,255,255));
 
+                fMat.copyTo(rgbaMat);
+
                 // Delay
                 try {
                     Thread.sleep(delay);
@@ -156,7 +159,7 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
         }
         frameCounter++;
 
-        return fMat;
+        return rgbaMat;
     }
 
     public void retrieveThreshColors() {
@@ -175,5 +178,4 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
         mDetector.setLowerBound(lowerBound);
         mDetector.setUpperBound(upperBound);
     }
-
 }

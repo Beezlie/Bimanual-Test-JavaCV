@@ -5,6 +5,8 @@
     <string name="calibrate_title">Calibration Parameters</string>
     <string name="button_send">Submit</string>
     <string name="focal_mm">Distance to camera (mm)</string>
+    <string name="distance">Distance to camera (m)</string>
+    <string name="calibrate">Calibrate</string>
     <string name="sensor_width_mm">Camera Sensor Width (mm)</string>
     <string name="leftHueLower">leftHueLower</string>
     <string name="leftSatLower">leftSatLower</string>
