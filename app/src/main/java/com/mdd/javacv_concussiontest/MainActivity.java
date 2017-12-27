@@ -23,23 +23,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        findViewById(R.id.btnRecord).setOnClickListener(new View.OnClickListener() {
 
-            @Override
-            public void onClick(View v) {
-                if (mPermissionReady) {
-                    startActivity(new Intent(MainActivity.this, RecordActivity.class));
-                }
-            }
-        });
-        findViewById(R.id.btnCalibrate).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (mPermissionReady) {
-                    startActivity(new Intent(MainActivity.this, CalibrateActivity.class));
-                }
-            }
-        });
         findViewById(R.id.btnVideoView).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

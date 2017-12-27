@@ -31,8 +31,8 @@ import static org.bytedeco.javacpp.opencv_imgproc.minAreaRect;
 import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 
 public class ProcessActivity extends Activity implements CvCameraPreview.CvCameraViewListener {
-    final String TAG = "ProcessActivity";
-
+    private final String TAG = "ProcessActivity";
+    private String measurement;
     private CvCameraPreview cameraView;
     private ColorBlobDetector mDetector = new ColorBlobDetector();
     private int centroidX, centroidY;
@@ -41,6 +41,7 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
     private Exception exception;
     private OpenCVFrameConverter.ToMat toMatConverter;
     private Frame frame;
+    private float pxscale;
     private long delay;
     private int frameCounter = 0;
 
@@ -48,12 +49,13 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.activity_real_time);
+        setContentView(R.layout.activity_process);
 
         cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
         cameraView.setCvCameraViewListener(this);
 
-        retrieveThreshColors();
+        getThreshColors();
+        pxscale = getPixelScale();
     }
 
 
@@ -162,7 +164,7 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
         return rgbaMat;
     }
 
-    public void retrieveThreshColors() {
+    public void getThreshColors() {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         double hueLower = (double)prefs.getInt(getString(R.string.rightHueLower), 0);
@@ -177,5 +179,18 @@ public class ProcessActivity extends Activity implements CvCameraPreview.CvCamer
 
         mDetector.setLowerBound(lowerBound);
         mDetector.setUpperBound(upperBound);
+    }
+
+    private float getPixelScale() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+        float pxscale = prefs.getFloat(getString(R.string.pxscale), 1);
+        if (pxscale == 1) {
+            measurement = "pixels";
+        } else {
+            measurement = "mm";
+        }
+
+        return pxscale;
     }
 }

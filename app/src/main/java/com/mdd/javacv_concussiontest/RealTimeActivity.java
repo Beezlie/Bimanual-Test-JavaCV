@@ -1,12 +1,17 @@
 package com.mdd.javacv_concussiontest;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
 
 import com.mdd.javacv_concussiontest.utils.ColorBlobDetector;
 
@@ -42,10 +47,11 @@ import static org.bytedeco.javacpp.opencv_imgproc.findContours;
 import static org.bytedeco.javacpp.opencv_imgproc.minAreaRect;
 import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 
-public class RealTimeActivity extends Activity implements View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
-    final String TAG = "RealTimeActivity";
+public class RealTimeActivity extends Activity implements View.OnClickListener, View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
+    private final String TAG = "RealTimeActivity";
 
     private CvCameraPreview cameraView;
+    private Button startButton;
     private File root;
     private File amplitudeData;
     private File boundingData;
@@ -58,16 +64,19 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
     private int xTouch, yTouch;
     private int centroidX, centroidY;
     private boolean screenTouched = false;
+    private boolean testing = false;
     private boolean[] mIsColorSelected = new boolean[2];
     private int selector = 0;
     private opencv_core.Scalar mBlobColorHsv = new opencv_core.Scalar(255);
     private opencv_core.Scalar CONTOUR_COLOR_WHITE = new opencv_core.Scalar(255,255,255,255);
+    private float pxscale;
     private int numCycles;
     private int dirChange;
     private int minPeak = 1000;
     private int maxPeak = 0;
     private String dirY;
     private String dirYprev;
+    private String measurement;
     private boolean movingY;
     private ArrayDeque<Integer> movingWindow = new ArrayDeque<>();
     private List<Integer> amplitudes = new ArrayList<>();
@@ -80,6 +89,9 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
 
         cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
         cameraView.setCvCameraViewListener(this);
+        startButton = (Button) findViewById(R.id.start);
+        startButton.setText("Start");
+        startButton.setOnClickListener(this);
 
         root = new File(Environment.getExternalStorageDirectory().toString());
         amplitudeData = new File(root, "real_time_amplitudes.txt");
@@ -107,6 +119,16 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
     public void onCameraViewStarted(int width, int height) {
         mDetectorList.add(mDetectorL);
         mDetectorList.add(mDetectorR);
+        pxscale = getPixelScale();
+        try {
+            String s = "Beginning of Test - Measurements in " + measurement;
+            boundingWriter.append(s);
+            boundingWriter.append("\n\r");
+            amplitudeWriter.append(s);
+            amplitudeWriter.append("\n\r");
+        } catch (IOException e) {
+            exception = e;
+        }
     }
 
     @Override
@@ -120,6 +142,19 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
             amplitudeWriter.close();
         } catch (IOException e) {
             exception = e;
+        }
+    }
+
+    @Override
+    public void onClick(View v) {
+        if (!testing) {
+            testing = true;
+            startButton.setText("Stop");
+            startButton.setBackgroundResource(R.drawable.bg_red_circle_button);
+        } else {
+            testing = false;
+            startButton.setText("Start");
+            startButton.setBackgroundResource(R.drawable.bg_green_circle_button);
         }
     }
 
@@ -169,14 +204,21 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
             //create a new bounding rectangle from the largest contour area
             Rect boundRect = boundingRect(contours.get(boundPos));
             rectangle(rgbaMat, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
-            String box = "Bounding box " + k + ": width = " + boundRect.width() + ", height = " + boundRect.height() +
-                    ", bottom right = (" + boundRect.br().x() + "," + boundRect.br().y() +
-                    "), top left = (" + boundRect.tl().x() + "," + boundRect.tl().y() + ")";
-            try {
-                boundingWriter.append(box);
-                boundingWriter.append("\n\r");
-            } catch (IOException e) {
-                exception = e;
+            String w = Float.toString(boundRect.width()/pxscale);
+            String h = Float.toString(boundRect.height()/pxscale);
+            String br = "(" + (boundRect.br().x()/pxscale) + "," + (boundRect.br().y()/pxscale) + ")";
+            String tl = "(" + (boundRect.tl().x()/pxscale) + "," + (boundRect.tl().y()/pxscale) + ")";
+            String box = "Bounding box " + k + ": width = " + w + ", height = " + h +
+                    ", bottom right = " + br + ", top left = " + tl;
+            Log.i(TAG, box);
+
+            if (testing) {
+                try {
+                    boundingWriter.append(box);
+                    boundingWriter.append("\n\r");
+                } catch (IOException e) {
+                    exception = e;
+                }
             }
 
             opencv_imgproc.CvMoments moments = new opencv_imgproc.CvMoments();
@@ -190,7 +232,9 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
             }
             circle(rgbaMat, new Point(centroidX, centroidY), 4, new Scalar(255, 255, 255, 255));
 
-            trackMotion(contours, centroidY, k);
+            if (testing) {
+                trackMotion(contours, centroidY, k);
+            }
         }
 
         return rgbaMat;
@@ -298,7 +342,7 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
                     dirChange = 0;
                     numCycles++;
 
-                    String result = "Object " + objectNum + "Amplitude = " + amp + ", at cycle number " + numCycles;
+                    String result = "Object " + objectNum + " Amplitude = " + (amp/pxscale) + ", at cycle number " + numCycles;
                     Log.i(TAG, result);
                     try {
                         amplitudeWriter.append(result);
@@ -310,5 +354,18 @@ public class RealTimeActivity extends Activity implements View.OnTouchListener, 
 
             }
         }
+    }
+
+    private float getPixelScale() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+        float pxscale = prefs.getFloat(getString(R.string.pxscale), 1);
+        if (pxscale == 1) {
+            measurement = "pixels";
+        } else {
+            measurement = "mm";
+        }
+
+        return pxscale;
     }
 }

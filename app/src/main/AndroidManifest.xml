@@ -23,7 +23,9 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:vmSafeMode="true">
-        <activity android:name=".MainActivity">
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -32,9 +34,6 @@
         </activity>
         <activity
             android:name=".RecordActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".CalibrateActivity"
             android:screenOrientation="landscape" />
         <activity
             android:name=".AnVideoView"
@@ -48,7 +47,9 @@
         <activity
             android:name=".RecorderActivity"
             android:screenOrientation="landscape" />
-        <activity android:name=".CalibrationActivity"></activity>
+        <activity
+            android:name=".CalibrationActivity"
+            android:screenOrientation="landscape" />
     </application>
 
 </manifest>

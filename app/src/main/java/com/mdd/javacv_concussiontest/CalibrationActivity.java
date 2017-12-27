@@ -3,7 +3,6 @@ package com.mdd.javacv_concussiontest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
@@ -35,8 +34,8 @@ import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 public class CalibrationActivity extends Activity implements View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
     private final static String TAG = "CalibrationActivity";
     //width and height of 8.5 x 11 inch paper - in mm
-    private final static int calibWidth = 216;
-    private final static int calibHeight = 279;
+    private final static float calibWidth = 216;
+    private final static float calibHeight = 279;
 
     private CvCameraPreview cameraView;
     private ColorBlobDetector mDetector;
@@ -56,7 +55,6 @@ public class CalibrationActivity extends Activity implements View.OnTouchListene
 
         cameraView = (CvCameraPreview) findViewById(R.id.camera_view);
         cameraView.setCvCameraViewListener(this);
-        distanceField = (EditText) findViewById(R.id.focal_mm);
 
         initLayout();
     }
@@ -179,23 +177,6 @@ public class CalibrationActivity extends Activity implements View.OnTouchListene
         touchedRegionHsv.release();
     }
 
-    public void calibrate(View button) {
-        float pxscale = getPixelScale(boundRect);
-        float distance = Float.parseFloat(distanceField.getText().toString());
-
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putFloat("pxscale", pxscale);
-        editor.putFloat("distance_m", distance);
-
-        Context context = getApplicationContext();
-        CharSequence text = "Calibration completed";
-        int duration = Toast.LENGTH_SHORT;
-
-        Toast toast = Toast.makeText(context, text, duration);
-        toast.show();
-    }
-
     //get the pixel scale in pixels per mm
     public float getPixelScale(Rect boundRect) {
         float hscale = boundRect.height() / calibHeight;
@@ -203,6 +184,22 @@ public class CalibrationActivity extends Activity implements View.OnTouchListene
 
         //TODO - figure out if i should return average of the 2 numbers or if there is a better way
         return (hscale + wscale) / 2;
+    }
+
+    public void calibrate(View button) {
+        float pxscale = getPixelScale(boundRect);
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putFloat(getString(R.string.pxscale), pxscale);
+        editor.commit();
+
+        Context context = getApplicationContext();
+        CharSequence text = "Calibration completed";
+        int duration = Toast.LENGTH_SHORT;
+
+        Toast toast = Toast.makeText(context, text, duration);
+        toast.show();
     }
 }
 

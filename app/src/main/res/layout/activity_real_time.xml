@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/realtime"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
@@ -12,4 +13,25 @@
         app:camera_type="back"
         app:scale_type="full" />
 
-</FrameLayout>
+    <TextView
+        android:id="@+id/instruction"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:textColor="#FF0000"
+        android:text="Tap to select objects before pressing start">
+    </TextView>
+
+    <Button
+        android:id="@+id/start"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_green_circle_button"
+        android:text="start"
+        android:textColor="@android:color/white" />
+
+</RelativeLayout>
