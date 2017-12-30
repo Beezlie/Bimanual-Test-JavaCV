@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -25,15 +24,14 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-import static android.content.ContentValues.TAG;
 import static java.lang.Math.abs;
 import static org.bytedeco.javacpp.opencv_core.CV_8UC4;
 import static org.bytedeco.javacpp.opencv_core.Mat;
 import static org.bytedeco.javacpp.opencv_core.MatVector;
 import static org.bytedeco.javacpp.opencv_core.Point;
-import static org.bytedeco.javacpp.opencv_core.Scalar;
 import static org.bytedeco.javacpp.opencv_core.Rect;
 import static org.bytedeco.javacpp.opencv_core.RotatedRect;
+import static org.bytedeco.javacpp.opencv_core.Scalar;
 import static org.bytedeco.javacpp.opencv_core.sumElems;
 import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2HSV_FULL;
 import static org.bytedeco.javacpp.opencv_imgproc.CV_CHAIN_APPROX_SIMPLE;
@@ -151,6 +149,7 @@ public class RealTimeActivity extends Activity implements View.OnClickListener, 
             testing = true;
             startButton.setText("Stop");
             startButton.setBackgroundResource(R.drawable.bg_red_circle_button);
+            Toast.makeText(this, "Results saved to internal storage", Toast.LENGTH_LONG).show();
         } else {
             testing = false;
             startButton.setText("Start");
@@ -307,7 +306,7 @@ public class RealTimeActivity extends Activity implements View.OnClickListener, 
             if (movingWindow.size() >= 5) {
                 int dY = movingWindow.getLast() - movingWindow.getFirst();
                 Log.i(TAG, "dY: " + dY);
-                if (abs(dY) > 100) {         //ensure significant movement
+                if (abs(dY) > 70) {         //ensure significant movement
                     int sign = Integer.signum(dY);
                     if (sign == 1) {
                         dirYprev = dirY;

@@ -57,6 +57,7 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
     private File savePath = new File(Environment.getExternalStorageDirectory(), "bimanualtest.mp4");
     private FFmpegFrameRecorder recorder;
     private long startTime = 0;
+    private int frameCounter = 0;
     private OpenCVFrameConverter.ToMat converterToMat = new OpenCVFrameConverter.ToMat();
     private final Object semaphore = new Object();
 
@@ -208,6 +209,7 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
 
         Log.i(LOG_TAG, "saved file path: " + savePath.getAbsolutePath());
         recorder = new FFmpegFrameRecorder(savePath, frameWidth, frameHeight, 0);
+        recorder.setVideoOption("preset", "ultrafast");
         recorder.setFormat("mp4");
         recorder.setVideoCodec(AV_CODEC_ID_MPEG4);
         recorder.setVideoQuality(1);
@@ -345,6 +347,8 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
                         recorder.setTimestamp(t);
                     }
                     recorder.record(frame);
+                    recorder.setFrameNumber(frameCounter);
+                    frameCounter++;
                 } catch (FFmpegFrameRecorder.Exception e) {
                     Log.v(LOG_TAG, e.getMessage());
                     e.printStackTrace();
