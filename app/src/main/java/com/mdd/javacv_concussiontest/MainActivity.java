@@ -40,14 +40,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        findViewById(R.id.btnProcess).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (mPermissionReady) {
-                    startActivity(new Intent(MainActivity.this, ProcessActivity.class));
-                }
-            }
-        });
         findViewById(R.id.btnRecorder).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -61,6 +53,14 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 if (mPermissionReady) {
                     startActivity(new Intent(MainActivity.this, CalibrationActivity.class));
+                }
+            }
+        });
+        findViewById(R.id.btnProcess).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (mPermissionReady) {
+                    startActivity(new Intent(MainActivity.this, ProcessingActivity.class));
                 }
             }
         });

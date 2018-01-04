@@ -413,13 +413,8 @@ public class RecorderActivity extends Activity implements OnClickListener, View.
         int red = (int)mBlobColorRgba.get(0);
         int green = (int)mBlobColorRgba.get(1);
         int blue = (int)mBlobColorRgba.get(2);
-        int alpha = (int)mBlobColorRgba.get(3);
         hexcolor = String.format("#%02x%02x%02x", red, green, blue);
-        Log.i(LOG_TAG, "Touched rgba color: (" + hexcolor + ")");
-        Log.i(LOG_TAG, "red: (" + red + ")");
-        Log.i(LOG_TAG, "green: (" + green + ")");
-        Log.i(LOG_TAG, "blue: (" + blue + ")");
-        Log.i(LOG_TAG, "alpha: (" + alpha + ")");
+        Log.i(LOG_TAG, "Selected rgba color: (" + hexcolor + ")");
 
         //set the colour of one of the buttons to the rgba colour selected
         if (selector == 0) {

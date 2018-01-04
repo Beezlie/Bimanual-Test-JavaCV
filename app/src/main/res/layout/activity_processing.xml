@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/caibration_layout"
+    android:id="@+id/processing"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
@@ -20,18 +20,19 @@
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
         android:textColor="#FF0000"
-        android:textSize="16dp"
-        android:text="Hold 8.5x11 inch paper in landscape orientation at distance test will be conducted.  Tap to select the paper.  Press calibrate button when bounding box is fully aligned.">
+        android:textSize="24dp"
+        android:text="Tap to select objects before pressing start">
     </TextView>
 
     <Button
-        android:id="@+id/calibrate"
-        android:layout_width="fill_parent"
+        android:id="@+id/start"
+        android:layout_width="64dp"
         android:layout_height="64dp"
-        android:layout_alignParentStart="true"
         android:layout_alignParentBottom="true"
-        android:onClick="calibrate"
-        android:text="@string/calibrate">
-    </Button>
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_green_circle_button"
+        android:text="start"
+        android:textColor="@android:color/white" />
 
 </RelativeLayout>

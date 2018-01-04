@@ -34,8 +34,8 @@ import static org.bytedeco.javacpp.opencv_imgproc.rectangle;
 public class CalibrationActivity extends Activity implements View.OnTouchListener, CvCameraPreview.CvCameraViewListener {
     private final static String TAG = "CalibrationActivity";
     //width and height of 8.5 x 11 inch paper - in mm
-    private final static float calibWidth = 216;
-    private final static float calibHeight = 279;
+    private final static float calibWidth = 279;
+    private final static float calibHeight = 216;
 
     private CvCameraPreview cameraView;
     private ColorBlobDetector mDetector;

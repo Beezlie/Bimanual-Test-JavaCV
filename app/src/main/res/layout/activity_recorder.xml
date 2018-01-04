@@ -49,6 +49,7 @@
         android:layout_alignParentTop="true"
         android:layout_toEndOf="@+id/right_color"
         android:textColor="#ff0000"
+        android:textSize="18dp"
         android:text="Tap each hand to set color selection before recording" />
 
 </RelativeLayout>

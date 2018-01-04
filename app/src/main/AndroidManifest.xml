@@ -33,9 +33,6 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".RecordActivity"
-            android:screenOrientation="landscape" />
-        <activity
             android:name=".AnVideoView"
             android:screenOrientation="landscape" />
         <activity
@@ -49,6 +46,9 @@
             android:screenOrientation="landscape" />
         <activity
             android:name=".CalibrationActivity"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name=".ProcessingActivity"
             android:screenOrientation="landscape" />
     </application>
 

@@ -169,70 +169,67 @@ public class RealTimeActivity extends Activity implements View.OnClickListener, 
 
         for (int k = 0; k < 2; k++) {
 
-            if (!mIsColorSelected[k])
-                return rgbaMat;
+            if (mIsColorSelected[k]) {
+                mDetectorList.get(k).threshold(rgbaMat);
 
-            mDetectorList.get(k).threshold(rgbaMat);
+                Mat threshed = mDetectorList.get(k).getThreshold();
 
-            Mat threshed = mDetectorList.get(k).getThreshold();
+                MatVector contours = new MatVector(); // MatVector is a JavaCV list of Mats
+                findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
-            MatVector contours = new MatVector(); // MatVector is a JavaCV list of Mats
-            findContours(threshed, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+                if (contours.size() > 0) {
+                    RotatedRect rect = minAreaRect(contours.get(0));
 
-            if (contours.size() <= 0) {
-                return rgbaMat;
-            }
+                    double boundWidth = rect.size().width();
+                    double boundHeight = rect.size().height();
+                    int boundPos = 0;
 
-            RotatedRect rect = minAreaRect(contours.get(0));
+                    //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
+                    for (int i = 1; i < contours.size(); i++) {
+                        rect = minAreaRect(contours.get(i));
+                        if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
+                            boundWidth = rect.size().width();
+                            boundHeight = rect.size().height();
+                            //store the location in the contour list of the maximum area bounding rectangle
+                            boundPos = i;
+                        }
+                    }
 
-            double boundWidth = rect.size().width();
-            double boundHeight = rect.size().height();
-            int boundPos = 0;
+                    //create a new bounding rectangle from the largest contour area
+                    Rect boundRect = boundingRect(contours.get(boundPos));
+                    rectangle(rgbaMat, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
+                    String w = Float.toString(boundRect.width() / pxscale);
+                    String h = Float.toString(boundRect.height() / pxscale);
+                    String br = "(" + (boundRect.br().x() / pxscale) + "," + (boundRect.br().y() / pxscale) + ")";
+                    String tl = "(" + (boundRect.tl().x() / pxscale) + "," + (boundRect.tl().y() / pxscale) + ")";
+                    String box = "Bounding box " + k + ": width = " + w + ", height = " + h +
+                            ", bottom right = " + br + ", top left = " + tl;
+                    Log.i(TAG, box);
 
-            //update the width and height for the bounding rectangle based on the area of each rectangle calculated from the contour list
-            for (int i = 1; i < contours.size(); i++) {
-                rect = minAreaRect(contours.get(i));
-                if (rect.size().width() * rect.size().height() > boundWidth * boundHeight) {
-                    boundWidth = rect.size().width();
-                    boundHeight = rect.size().height();
-                    //store the location in the contour list of the maximum area bounding rectangle
-                    boundPos = i;
+                    if (testing) {
+                        try {
+                            boundingWriter.append(box);
+                            boundingWriter.append("\n\r");
+                        } catch (IOException e) {
+                            exception = e;
+                        }
+                    }
+
+                    opencv_imgproc.CvMoments moments = new opencv_imgproc.CvMoments();
+                    cvMoments(new opencv_core.IplImage(contours.get(boundPos)), moments, 1);
+                    double m00 = cvGetSpatialMoment(moments, 0, 0);
+                    double m10 = cvGetSpatialMoment(moments, 1, 0);
+                    double m01 = cvGetSpatialMoment(moments, 0, 1);
+                    if (m00 != 0) {   // calculate center
+                        centroidX = (int) Math.round(m10 / m00);
+                        centroidY = (int) Math.round(m01 / m00);
+                    }
+                    circle(rgbaMat, new Point(centroidX, centroidY), 4, new Scalar(255, 255, 255, 255));
+
+                    if (testing) {
+                        trackMotion(contours, centroidY, k);
+                    }
                 }
-            }
-
-            //create a new bounding rectangle from the largest contour area
-            Rect boundRect = boundingRect(contours.get(boundPos));
-            rectangle(rgbaMat, boundRect.tl(), boundRect.br(), CONTOUR_COLOR_WHITE, 2, 8, 0);
-            String w = Float.toString(boundRect.width()/pxscale);
-            String h = Float.toString(boundRect.height()/pxscale);
-            String br = "(" + (boundRect.br().x()/pxscale) + "," + (boundRect.br().y()/pxscale) + ")";
-            String tl = "(" + (boundRect.tl().x()/pxscale) + "," + (boundRect.tl().y()/pxscale) + ")";
-            String box = "Bounding box " + k + ": width = " + w + ", height = " + h +
-                    ", bottom right = " + br + ", top left = " + tl;
-            Log.i(TAG, box);
-
-            if (testing) {
-                try {
-                    boundingWriter.append(box);
-                    boundingWriter.append("\n\r");
-                } catch (IOException e) {
-                    exception = e;
-                }
-            }
-
-            opencv_imgproc.CvMoments moments = new opencv_imgproc.CvMoments();
-            cvMoments(new opencv_core.IplImage(contours.get(boundPos)), moments, 1);
-            double m00 = cvGetSpatialMoment(moments, 0, 0);
-            double m10 = cvGetSpatialMoment(moments, 1, 0);
-            double m01 = cvGetSpatialMoment(moments, 0, 1);
-            if (m00 != 0) {   // calculate center
-                centroidX = (int) Math.round(m10 / m00);
-                centroidY = (int) Math.round(m01 / m00);
-            }
-            circle(rgbaMat, new Point(centroidX, centroidY), 4, new Scalar(255, 255, 255, 255));
-
-            if (testing) {
-                trackMotion(contours, centroidY, k);
             }
         }
 
